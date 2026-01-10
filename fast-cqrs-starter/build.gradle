@@ -1,0 +1,29 @@
+plugins {
+    id 'java-library'
+}
+
+description = 'Fast Framework Starter - All-in-one dependency for the complete framework'
+
+dependencies {
+    // Core CQRS Framework
+    api project(':fast-cqrs-core')
+    api project(':fast-cqrs-autoconfigure')
+    
+    // SQL Repository
+    api project(':fast-cqrs-sql')
+    
+    // Modal/DTO Mapping
+    api project(':fast-cqrs-modal')
+    
+    // Logging & Tracing
+    api project(':fast-cqrs-logging')
+    
+    // Utilities
+    api project(':fast-cqrs-util')
+    
+    // Spring Boot Starter Web (common dependency)
+    api 'org.springframework.boot:spring-boot-starter-web'
+    
+    // Spring Boot Starter JDBC (for SQL repositories)
+    api 'org.springframework.boot:spring-boot-starter-jdbc'
+}

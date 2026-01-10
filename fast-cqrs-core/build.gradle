@@ -1,0 +1,20 @@
+plugins {
+    id 'java-library'
+}
+
+description = 'CQRS Core Framework - Annotations, Buses, Handlers, and Proxy'
+
+dependencies {
+    // Spring MVC for annotations and web support
+    api 'org.springframework:spring-web'
+    api 'org.springframework:spring-context'
+    
+    // Jakarta validation
+    api 'jakarta.validation:jakarta.validation-api'
+    
+    // Logging
+    implementation 'org.slf4j:slf4j-api'
+    
+    // Testing
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+}

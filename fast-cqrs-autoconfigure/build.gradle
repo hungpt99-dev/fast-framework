@@ -1,0 +1,25 @@
+plugins {
+    id 'java-library'
+}
+
+description = 'CQRS Auto-Configuration for Spring Boot 4'
+
+dependencies {
+    api project(':fast-cqrs-core')
+    
+    // Spring Boot auto-configuration
+    implementation 'org.springframework.boot:spring-boot-autoconfigure'
+    
+    // Classpath scanning
+    implementation 'org.springframework:spring-context'
+    
+    // Logging
+    implementation 'org.slf4j:slf4j-api'
+    
+    // Optional: configuration properties processor
+    annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
+    
+    // Testing
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-web'
+}

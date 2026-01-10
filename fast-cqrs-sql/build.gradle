@@ -1,0 +1,22 @@
+plugins {
+    id 'java-library'
+}
+
+description = 'CQRS SQL Repository - Interface-only SQL repositories with Spring JDBC'
+
+dependencies {
+    // Spring JDBC
+    api 'org.springframework:spring-jdbc'
+    api 'org.springframework:spring-context'
+    
+    // Logging
+    implementation 'org.slf4j:slf4j-api'
+    
+    // Spring Boot auto-configuration (optional)
+    compileOnly 'org.springframework.boot:spring-boot-autoconfigure'
+    annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
+    
+    // Testing
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'com.h2database:h2'
+}

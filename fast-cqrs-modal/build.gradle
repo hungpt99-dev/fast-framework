@@ -1,0 +1,13 @@
+plugins {
+    id 'java-library'
+}
+
+description = 'CQRS Modal/DTO Conversion - Entity to Map transformation'
+
+dependencies {
+    // Logging
+    implementation 'org.slf4j:slf4j-api'
+    
+    // Testing
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+}

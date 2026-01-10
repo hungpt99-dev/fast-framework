@@ -1,0 +1,9 @@
+rootProject.name = 'fast-cqrs-framework'
+
+include 'fast-cqrs-core'
+include 'fast-cqrs-autoconfigure'
+include 'fast-cqrs-modal'
+include 'fast-cqrs-sql'
+include 'fast-cqrs-logging'
+include 'fast-cqrs-util'
+include 'fast-cqrs-starter'

@@ -1,0 +1,29 @@
+plugins {
+    id 'java-library'
+}
+
+description = 'CQRS Logging Framework - Tracing, MDC, and Exception Handling'
+
+dependencies {
+    // Spring Web for filters and exception handling
+    api 'org.springframework:spring-web'
+    api 'org.springframework:spring-webmvc'
+    
+    // AOP for aspects
+    api 'org.springframework:spring-aop'
+    api 'org.aspectj:aspectjweaver'
+    
+    // Logging
+    api 'org.slf4j:slf4j-api'
+    
+    // Servlet API
+    compileOnly 'jakarta.servlet:jakarta.servlet-api'
+    
+    // Spring Boot auto-configuration
+    compileOnly 'org.springframework.boot:spring-boot-autoconfigure'
+    annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
+    
+    // Testing
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-web'
+}

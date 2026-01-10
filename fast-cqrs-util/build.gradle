@@ -1,0 +1,17 @@
+plugins {
+    id 'java-library'
+}
+
+description = 'CQRS Utilities - Common helper classes and utilities'
+
+dependencies {
+    // Logging
+    implementation 'org.slf4j:slf4j-api'
+    
+    // JSON (optional)
+    compileOnly 'com.fasterxml.jackson.core:jackson-databind'
+    
+    // Testing
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'com.fasterxml.jackson.core:jackson-databind'
+}
