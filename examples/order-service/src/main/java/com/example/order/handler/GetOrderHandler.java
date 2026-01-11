@@ -11,6 +11,10 @@ import org.springframework.stereotype.Component;
 
 /**
  * Handler for GetOrderQuery.
+ * <p>
+ * Registered automatically with QueryBus.
+ * Controller uses @Query without handler - framework auto-dispatches by query
+ * type.
  */
 @Component
 public class GetOrderHandler implements QueryHandler<GetOrderQuery, OrderDto> {
@@ -25,6 +29,17 @@ public class GetOrderHandler implements QueryHandler<GetOrderQuery, OrderDto> {
     @Override
     public OrderDto handle(GetOrderQuery query) {
         Order order = orderRepository.findById(query.id()).orElse(null);
-        return order != null ? OrderDto.fromEntity(order) : null;
+
+        if (order == null) {
+            return null;
+        }
+
+        // Apply query options
+        OrderDto dto = OrderDto.fromEntity(order);
+
+        // TODO: If query.includeItems() or query.includeCustomer(),
+        // fetch additional data
+
+        return dto;
     }
 }

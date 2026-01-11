@@ -24,6 +24,13 @@ dependencies {
     
     // H2 Database for demo
     runtimeOnly 'com.h2database:h2'
+    
+    // Testing
+    testImplementation 'org.springframework.boot:spring-boot-starter-test:4.0.0'
+    testImplementation 'org.springframework.boot:spring-boot-test:4.0.0'
+    testImplementation 'org.springframework.boot:spring-boot-test-autoconfigure:4.0.0'
+    testImplementation 'com.fasterxml.jackson.core:jackson-databind' // Should be managed by BOM
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
 tasks.named('test') {

@@ -18,7 +18,7 @@ import java.util.List;
 public interface OrderRepository extends FastRepository<Order, String> {
 
     // CRUD methods from FastRepository:
-    // - findById(String id) 
+    // - findById(String id)
     // - findAll()
     // - save(Order entity)
     // - saveAll(List<Order> entities)
@@ -35,4 +35,9 @@ public interface OrderRepository extends FastRepository<Order, String> {
 
     @Select("SELECT * FROM orders WHERE status = :status")
     List<Order> findByStatus(@Param("status") String status);
+
+    @Select("SELECT * FROM orders WHERE customer_id = :customerId AND status = :status")
+    List<Order> findByCustomerIdAndStatus(
+            @Param("customerId") String customerId,
+            @Param("status") String status);
 }

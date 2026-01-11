@@ -4,9 +4,6 @@ import com.example.order.dto.CreateOrderCmd;
 import com.example.order.dto.GetOrderQuery;
 import com.example.order.dto.GetOrdersByCustomerQuery;
 import com.example.order.dto.OrderDto;
-import com.example.order.handler.CreateOrderHandler;
-import com.example.order.handler.GetOrderHandler;
-import com.example.order.handler.GetOrdersByCustomerHandler;
 import com.fast.cqrs.annotation.CacheableQuery;
 import com.fast.cqrs.annotation.Command;
 import com.fast.cqrs.annotation.HttpController;
@@ -22,10 +19,13 @@ import java.util.List;
 
 /**
  * Order API Controller demonstrating CQRS features.
- * 
+ * <p>
  * REST conventions:
- * - @Query + @GetMapping for reads
+ * - @Query + @GetMapping for reads (handler is optional)
  * - @Command + @PostMapping for writes
+ * <p>
+ * Query endpoints use @ModelAttribute to bind query parameters.
+ * The framework auto-detects @ModelAttribute and dispatches to QueryBus.
  */
 @HttpController
 @RequestMapping("/api/orders")
@@ -33,27 +33,31 @@ public interface OrderController {
 
     /**
      * Get order by ID.
+     * <p>
+     * Handler is optional - QueryBus finds handler by query type (GetOrderQuery).
      */
     @CacheableQuery(ttl = "5m")
     @Metrics(name = "orders.get")
-    @Query(handler = GetOrderHandler.class)
+    @Query
     @GetMapping("/{id}")
-    OrderDto getOrder(@PathVariable String id);
+    OrderDto getOrder(@PathVariable String id, @ModelAttribute GetOrderQuery query);
 
     /**
-     * Get orders by customer.
+     * Get orders by customer with pagination.
+     * <p>
+     * Uses @ModelAttribute to bind query parameters from URL.
      */
     @CacheableQuery(ttl = "1m")
-    @Query(handler = GetOrdersByCustomerHandler.class)
+    @Query
     @GetMapping
-    List<OrderDto> getOrdersByCustomer(@RequestParam String customerId);
+    List<OrderDto> getOrdersByCustomer(@ModelAttribute GetOrdersByCustomerQuery query);
 
     /**
      * Create a new order.
      */
     @RetryCommand(maxAttempts = 3, backoff = "100ms")
     @Metrics(name = "orders.create")
-    @Command(handler = CreateOrderHandler.class)
+    @Command
     @PostMapping
     void createOrder(@Valid @RequestBody CreateOrderCmd cmd);
 }

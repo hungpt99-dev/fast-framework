@@ -13,6 +13,10 @@ import java.util.List;
 
 /**
  * Handler for GetOrdersByCustomerQuery.
+ * <p>
+ * Registered automatically with QueryBus.
+ * Controller uses @Query without handler - framework auto-dispatches by query
+ * type.
  */
 @Component
 public class GetOrdersByCustomerHandler implements QueryHandler<GetOrdersByCustomerQuery, List<OrderDto>> {
@@ -26,7 +30,22 @@ public class GetOrdersByCustomerHandler implements QueryHandler<GetOrdersByCusto
     @TraceLog(slowMs = 200)
     @Override
     public List<OrderDto> handle(GetOrdersByCustomerQuery query) {
-        List<Order> orders = orderRepository.findByCustomerId(query.customerId());
-        return orders.stream().map(OrderDto::fromEntity).toList();
+        // Use pagination parameters from query
+        List<Order> orders;
+
+        if (query.status() != null) {
+            orders = orderRepository.findByCustomerIdAndStatus(
+                    query.customerId(),
+                    query.status());
+        } else {
+            orders = orderRepository.findByCustomerId(query.customerId());
+        }
+
+        // TODO: Apply pagination (page, size) and sorting (sort)
+        // For now, just return all matching orders
+
+        return orders.stream()
+                .map(OrderDto::fromEntity)
+                .toList();
     }
 }
