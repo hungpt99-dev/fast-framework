@@ -18,22 +18,22 @@ public class SimpleEventBus implements EventBus {
 
     private static final Logger log = LoggerFactory.getLogger(SimpleEventBus.class);
 
-    private final Map<Class<?>, List<EventHandler<?>>> handlers = new ConcurrentHashMap<>();
+    private final Map<Class<?>, List<DomainEventHandler<?>>> handlers = new ConcurrentHashMap<>();
 
     @Override
     @SuppressWarnings("unchecked")
     public <E extends DomainEvent> void publish(E event) {
         log.debug("Publishing event: {} (id={})", event.getEventType(), event.getEventId());
 
-        List<EventHandler<?>> eventHandlers = handlers.get(event.getClass());
+        List<DomainEventHandler<?>> eventHandlers = handlers.get(event.getClass());
         if (eventHandlers == null || eventHandlers.isEmpty()) {
             log.debug("No handlers registered for event: {}", event.getEventType());
             return;
         }
 
-        for (EventHandler<?> handler : eventHandlers) {
+        for (DomainEventHandler<?> handler : eventHandlers) {
             try {
-                ((EventHandler<E>) handler).handle(event);
+                ((DomainEventHandler<E>) handler).handle(event);
                 log.debug("Handler {} processed event {}", 
                           handler.getClass().getSimpleName(), event.getEventId());
             } catch (Exception e) {
@@ -44,7 +44,7 @@ public class SimpleEventBus implements EventBus {
     }
 
     @Override
-    public <E extends DomainEvent> void subscribe(Class<E> eventType, EventHandler<E> handler) {
+    public <E extends DomainEvent> void subscribe(Class<E> eventType, DomainEventHandler<E> handler) {
         handlers.computeIfAbsent(eventType, k -> new ArrayList<>()).add(handler);
         log.info("Registered handler {} for event {}", 
                  handler.getClass().getSimpleName(), eventType.getSimpleName());

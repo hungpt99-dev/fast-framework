@@ -15,6 +15,13 @@ dependencies {
     // Logging
     implementation 'org.slf4j:slf4j-api'
     
+    // Optional: Jackson for event serialization (JdbcEventStore, RedisEventStore)
+    compileOnly 'com.fasterxml.jackson.core:jackson-databind'
+    
+    // Optional: JDBC for JdbcEventStore
+    compileOnly 'org.springframework:spring-jdbc'
+    
     // Testing
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
 }
+

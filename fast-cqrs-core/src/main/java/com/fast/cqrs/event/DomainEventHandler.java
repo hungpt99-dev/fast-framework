@@ -8,7 +8,7 @@ package com.fast.cqrs.event;
  * Example:
  * <pre>{@code
  * @Component
- * public class OrderCreatedHandler implements EventHandler<OrderCreatedEvent> {
+ * public class OrderCreatedHandler implements DomainEventHandler<OrderCreatedEvent> {
  *     @Override
  *     public void handle(OrderCreatedEvent event) {
  *         // Send notification, update read model, etc.
@@ -18,7 +18,7 @@ package com.fast.cqrs.event;
  *
  * @param <E> the event type
  */
-public interface EventHandler<E extends DomainEvent> {
+public interface DomainEventHandler<E extends DomainEvent> {
     
     /**
      * Handles the event.

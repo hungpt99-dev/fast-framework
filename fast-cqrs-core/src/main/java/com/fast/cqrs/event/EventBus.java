@@ -31,5 +31,5 @@ public interface EventBus {
      * @param handler   the handler
      * @param <E>       the event type
      */
-    <E extends DomainEvent> void subscribe(Class<E> eventType, EventHandler<E> handler);
+    <E extends DomainEvent> void subscribe(Class<E> eventType, DomainEventHandler<E> handler);
 }
