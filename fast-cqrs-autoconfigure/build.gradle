@@ -6,6 +6,7 @@ description = 'CQRS Auto-Configuration for Spring Boot 4'
 
 dependencies {
     api project(':fast-cqrs-core')
+    api project(':fast-cqrs-dx')
     implementation project(':fast-cqrs-sql') // Added for SqlRepositoryRegistrar
     
     // Spring Boot auto-configuration

@@ -27,6 +27,9 @@ dependencies {
     // Event Sourcing
     api project(':fast-cqrs-eventsourcing')
     
+    // Developer Experience (CLI, Conventions)
+    api project(':fast-cqrs-dx')
+    
     // Spring Boot Starter Web (common dependency)
     api 'org.springframework.boot:spring-boot-starter-web'
     

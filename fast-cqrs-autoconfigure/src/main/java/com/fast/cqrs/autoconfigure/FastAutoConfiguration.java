@@ -1,7 +1,7 @@
 package com.fast.cqrs.autoconfigure;
 
-import com.fast.cqrs.autoconfigure.convention.ConventionScanner;
-import com.fast.cqrs.autoconfigure.convention.NamingConventionValidator;
+import com.fast.cqrs.dx.convention.ConventionScanner;
+import com.fast.cqrs.dx.convention.NamingConventionValidator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.config.BeanDefinition;
@@ -16,10 +16,10 @@ import org.springframework.core.type.filter.AnnotationTypeFilter;
  * <p>
  * Automatically scans and configures:
  * <ul>
- *   <li>CQRS Controllers</li>
- *   <li>SQL Repositories</li>
- *   <li>Event Handlers</li>
- *   <li>Aggregates</li>
+ * <li>CQRS Controllers</li>
+ * <li>SQL Repositories</li>
+ * <li>Event Handlers</li>
+ * <li>Aggregates</li>
  * </ul>
  */
 @Configuration

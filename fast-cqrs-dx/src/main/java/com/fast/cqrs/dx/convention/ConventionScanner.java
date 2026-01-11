@@ -1,4 +1,4 @@
-package com.fast.cqrs.autoconfigure.convention;
+package com.fast.cqrs.dx.convention;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,7 +17,7 @@ public class ConventionScanner {
      */
     public void scan(String basePackage) {
         log.debug("Scanning {} for conventional components", basePackage);
-        
+
         // Convention-based locations
         String controllerPackage = basePackage + ".controller";
         String handlerPackage = basePackage + ".handler";
@@ -25,7 +25,7 @@ public class ConventionScanner {
         String entityPackage = basePackage + ".entity";
         String eventPackage = basePackage + ".event";
         String aggregatePackage = basePackage + ".aggregate";
-        
+
         log.debug("Expected locations:");
         log.debug("  Controllers: {}", controllerPackage);
         log.debug("  Handlers: {}", handlerPackage);

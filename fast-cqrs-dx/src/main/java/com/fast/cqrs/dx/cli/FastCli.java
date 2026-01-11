@@ -1,0 +1,511 @@
+package com.fast.cqrs.dx.cli;
+
+import picocli.CommandLine;
+import picocli.CommandLine.Command;
+import picocli.CommandLine.Parameters;
+import picocli.CommandLine.Option;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.concurrent.Callable;
+
+/**
+ * CLI Code Generator for Fast Framework.
+ * <p>
+ * Generates feature-based code structure (Clean Architecture):
+ * 
+ * <pre>
+ * com.example.order/
+ * ├── api/           # Controllers, DTOs
+ * ├── domain/        # Entities, Aggregates, Events
+ * ├── application/   # Handlers
+ * └── infrastructure/ # Repositories
+ * </pre>
+ * <p>
+ * Usage:
+ * 
+ * <pre>
+ * fast-cli generate controller Order
+ * fast-cli generate handler CreateOrder
+ * fast-cli generate all Order
+ * </pre>
+ */
+@Command(name = "fast-cli", mixinStandardHelpOptions = true, version = "1.0.0", description = "Fast Framework CLI - Code Generator and Developer Tools")
+public class FastCli implements Callable<Integer> {
+
+    @Override
+    public Integer call() {
+        CommandLine.usage(this, System.out);
+        return 0;
+    }
+
+    public static void main(String[] args) {
+        int exitCode = new CommandLine(new FastCli())
+                .addSubcommand("generate", new GenerateCommand())
+                .addSubcommand("g", new GenerateCommand())
+                .execute(args);
+        System.exit(exitCode);
+    }
+}
+
+/**
+ * Generate command for creating components.
+ */
+@Command(name = "generate", aliases = { "g" }, description = "Generate framework components (feature-based structure)")
+class GenerateCommand implements Callable<Integer> {
+
+    @Parameters(index = "0", description = "Component type: controller, handler, entity, repository, event, aggregate, dto, all")
+    private String type;
+
+    @Parameters(index = "1", description = "Feature/Component name (e.g., Order, CreateOrder)")
+    private String name;
+
+    @Option(names = { "-p",
+            "--package" }, description = "Base package (default: com.example)", defaultValue = "com.example")
+    private String basePackage;
+
+    @Option(names = { "-o",
+            "--output" }, description = "Output directory (default: src/main/java)", defaultValue = "src/main/java")
+    private String outputDir;
+
+    @Option(names = { "-f", "--feature" }, description = "Feature name (default: derived from component name)")
+    private String featureName;
+
+    @Override
+    public Integer call() {
+        try {
+            // Derive feature name from component name if not specified
+            String feature = featureName != null ? featureName : deriveFeatureName(name, type);
+
+            FeatureGenerator generator = new FeatureGenerator(basePackage, outputDir, feature);
+
+            switch (type.toLowerCase()) {
+                case "controller" -> generator.generateController(name);
+                case "handler" -> generator.generateHandler(name);
+                case "entity" -> generator.generateEntity(name);
+                case "repository" -> generator.generateRepository(name);
+                case "event" -> generator.generateEvent(name);
+                case "aggregate" -> generator.generateAggregate(name);
+                case "dto" -> generator.generateDto(name);
+                case "all" -> generator.generateAll(name);
+                default -> {
+                    System.err.println("Unknown type: " + type);
+                    System.err.println(
+                            "Valid types: controller, handler, entity, repository, event, aggregate, dto, all");
+                    return 1;
+                }
+            }
+            return 0;
+        } catch (IOException e) {
+            System.err.println("Error: " + e.getMessage());
+            return 1;
+        }
+    }
+
+    /**
+     * Derives feature name from component name.
+     * e.g., "CreateOrderHandler" -> "order", "OrderController" -> "order"
+     */
+    private String deriveFeatureName(String name, String type) {
+        String baseName = name;
+
+        // Remove common suffixes
+        String[] suffixes = { "Controller", "Handler", "Repository", "Event", "Aggregate", "Cmd", "Query", "Dto" };
+        for (String suffix : suffixes) {
+            if (baseName.endsWith(suffix)) {
+                baseName = baseName.substring(0, baseName.length() - suffix.length());
+                break;
+            }
+        }
+
+        // Remove common prefixes like "Create", "Update", "Delete", "Get"
+        String[] prefixes = { "Create", "Update", "Delete", "Get", "Find", "List" };
+        for (String prefix : prefixes) {
+            if (baseName.startsWith(prefix) && baseName.length() > prefix.length()) {
+                baseName = baseName.substring(prefix.length());
+                break;
+            }
+        }
+
+        return baseName.toLowerCase();
+    }
+}
+
+/**
+ * Feature-based component generator (Clean Architecture).
+ * <p>
+ * Structure:
+ * 
+ * <pre>
+ * {basePackage}.{feature}/
+ * ├── api/           # Controllers, DTOs (Cmd, Query, Response)
+ * ├── domain/        # Entities, Aggregates, Events, Value Objects
+ * ├── application/   # Handlers (Command/Query handlers)
+ * └── infrastructure/ # Repositories, External integrations
+ * </pre>
+ */
+class FeatureGenerator {
+
+    private final String basePackage;
+    private final String outputDir;
+    private final String feature;
+
+    FeatureGenerator(String basePackage, String outputDir, String feature) {
+        this.basePackage = basePackage;
+        this.outputDir = outputDir;
+        this.feature = feature.toLowerCase();
+    }
+
+    private String featurePackage() {
+        return basePackage + "." + feature;
+    }
+
+    void generateController(String name) throws IOException {
+        String className = ensureSuffix(name, "Controller");
+        String entityName = removeSuffix(name, "Controller");
+
+        String content = """
+                package %s.api;
+
+                import com.fast.cqrs.annotation.HttpController;
+                import com.fast.cqrs.annotation.Query;
+                import com.fast.cqrs.annotation.Command;
+                import org.springframework.web.bind.annotation.*;
+
+                /**
+                 * REST API controller for %s feature.
+                 */
+                @HttpController
+                @RequestMapping("/api/%s")
+                public interface %s {
+
+                    @Query
+                    @GetMapping("/{id}")
+                    %sDto get%s(@PathVariable String id);
+
+                    @Command
+                    @PostMapping
+                    void create%s(@RequestBody Create%sCmd cmd);
+
+                    @Command
+                    @PutMapping("/{id}")
+                    void update%s(@PathVariable String id, @RequestBody Update%sCmd cmd);
+
+                    @Command
+                    @DeleteMapping("/{id}")
+                    void delete%s(@PathVariable String id);
+                }
+                """.formatted(
+                featurePackage(),
+                entityName,
+                feature + "s",
+                className,
+                entityName, entityName,
+                entityName, entityName,
+                entityName, entityName,
+                entityName);
+
+        writeFile("api", className, content);
+    }
+
+    void generateHandler(String name) throws IOException {
+        String className = ensureSuffix(name, "Handler");
+        String commandName = removeSuffix(name, "Handler");
+
+        String content = """
+                package %s.application;
+
+                import %s.api.%sCmd;
+                import com.fast.cqrs.handler.CommandHandler;
+                import org.springframework.stereotype.Component;
+
+                /**
+                 * Handler for %s command.
+                 */
+                @Component
+                public class %s implements CommandHandler<%sCmd> {
+
+                    @Override
+                    public void handle(%sCmd cmd) {
+                        // TODO: Implement business logic
+                    }
+                }
+                """.formatted(
+                featurePackage(),
+                featurePackage(), commandName,
+                commandName,
+                className, commandName,
+                commandName);
+
+        writeFile("application", className, content);
+    }
+
+    void generateEntity(String name) throws IOException {
+        String className = removeSuffix(name, "Entity");
+
+        String content = """
+                package %s.domain;
+
+                import com.fast.cqrs.sql.repository.Id;
+                import com.fast.cqrs.sql.repository.Table;
+                import com.fast.cqrs.sql.repository.Column;
+
+                /**
+                 * %s entity.
+                 */
+                @Table("%ss")
+                public class %s {
+
+                    @Id
+                    private String id;
+
+                    @Column
+                    private String name;
+
+                    @Column
+                    private String status;
+
+                    public %s() {}
+
+                    public %s(String id) {
+                        this.id = id;
+                    }
+
+                    // Getters and Setters
+                    public String getId() { return id; }
+                    public void setId(String id) { this.id = id; }
+
+                    public String getName() { return name; }
+                    public void setName(String name) { this.name = name; }
+
+                    public String getStatus() { return status; }
+                    public void setStatus(String status) { this.status = status; }
+                }
+                """.formatted(
+                featurePackage(),
+                className,
+                feature,
+                className,
+                className,
+                className);
+
+        writeFile("domain", className, content);
+    }
+
+    void generateRepository(String name) throws IOException {
+        String entityName = removeSuffix(name, "Repository");
+        String className = entityName + "Repository";
+
+        String content = """
+                package %s.infrastructure;
+
+                import %s.domain.%s;
+                import com.fast.cqrs.sql.annotation.SqlRepository;
+                import com.fast.cqrs.sql.repository.FastRepository;
+
+                import java.util.List;
+
+                /**
+                 * Repository for %s entity.
+                 */
+                @SqlRepository
+                public interface %s extends FastRepository<%s, String> {
+
+                    List<%s> findByStatus(String status);
+                }
+                """.formatted(
+                featurePackage(),
+                featurePackage(), entityName,
+                entityName,
+                className, entityName,
+                entityName);
+
+        writeFile("infrastructure", className, content);
+    }
+
+    void generateEvent(String name) throws IOException {
+        String className = ensureSuffix(name, "Event");
+
+        String content = """
+                package %s.domain;
+
+                import com.fast.cqrs.event.DomainEvent;
+
+                /**
+                 * Domain event: %s.
+                 */
+                public class %s extends DomainEvent {
+
+                    private final String entityId;
+
+                    public %s(String aggregateId, String entityId) {
+                        super(aggregateId);
+                        this.entityId = entityId;
+                    }
+
+                    public String getEntityId() {
+                        return entityId;
+                    }
+                }
+                """.formatted(featurePackage(), className, className, className);
+
+        writeFile("domain", className, content);
+    }
+
+    void generateAggregate(String name) throws IOException {
+        String className = ensureSuffix(name, "Aggregate");
+        String entityName = removeSuffix(name, "Aggregate");
+
+        String content = """
+                package %s.domain;
+
+                import com.fast.cqrs.eventsourcing.Aggregate;
+                import com.fast.cqrs.eventsourcing.ApplyEvent;
+                import com.fast.cqrs.eventsourcing.EventSourced;
+
+                /**
+                 * %s aggregate root.
+                 */
+                @EventSourced
+                public class %s extends Aggregate {
+
+                    private String status;
+
+                    public %s() {
+                        super();
+                    }
+
+                    public %s(String id) {
+                        super(id);
+                        this.status = "CREATED";
+                    }
+
+                    // Commands
+                    public void create() {
+                        apply(new %sCreatedEvent(getId(), getId()));
+                    }
+
+                    // Event handlers
+                    @ApplyEvent
+                    public void on(%sCreatedEvent event) {
+                        this.status = "CREATED";
+                    }
+
+                    // Getters
+                    public String getStatus() {
+                        return status;
+                    }
+                }
+                """.formatted(
+                featurePackage(),
+                entityName,
+                className,
+                className,
+                className,
+                entityName,
+                entityName);
+
+        writeFile("domain", className, content);
+    }
+
+    void generateDto(String name) throws IOException {
+        String baseName = name;
+
+        // Generate Command DTO
+        String cmdClassName = ensureSuffix(baseName, "Cmd");
+        String cmdContent = """
+                package %s.api;
+
+                import jakarta.validation.constraints.NotBlank;
+
+                /**
+                 * Command DTO for %s.
+                 */
+                public record %s(
+                    @NotBlank String name
+                ) {}
+                """.formatted(featurePackage(), baseName, cmdClassName);
+        writeFile("api", cmdClassName, cmdContent);
+
+        // Generate Response DTO
+        String dtoClassName = removeSuffix(baseName, "Cmd") + "Dto";
+        if (!dtoClassName.equals(cmdClassName)) {
+            String dtoContent = """
+                    package %s.api;
+
+                    /**
+                     * Response DTO for %s.
+                     */
+                    public record %s(
+                        String id,
+                        String name,
+                        String status
+                    ) {}
+                    """.formatted(featurePackage(), baseName, dtoClassName);
+            writeFile("api", dtoClassName, dtoContent);
+        }
+    }
+
+    void generateAll(String name) throws IOException {
+        String entityName = capitalize(name);
+
+        System.out.println("📦 Generating feature: " + feature);
+        System.out.println("   Base package: " + featurePackage());
+        System.out.println();
+
+        // Domain layer
+        generateEntity(entityName);
+        generateAggregate(entityName);
+        generateEvent(entityName + "Created");
+
+        // API layer
+        generateController(entityName);
+        generateDto("Create" + entityName);
+        generateDto("Update" + entityName);
+        generateDto(entityName);
+
+        // Application layer
+        generateHandler("Create" + entityName);
+        generateHandler("Update" + entityName);
+        generateHandler("Delete" + entityName);
+
+        // Infrastructure layer
+        generateRepository(entityName);
+
+        System.out.println();
+        System.out.println("✅ Generated all components for feature: " + feature);
+        System.out.println();
+        System.out.println("Structure:");
+        System.out.println("  " + featurePackage() + "/");
+        System.out.println("  ├── api/           # Controllers, DTOs");
+        System.out.println("  ├── domain/        # Entities, Aggregates, Events");
+        System.out.println("  ├── application/   # Handlers");
+        System.out.println("  └── infrastructure/ # Repositories");
+    }
+
+    private void writeFile(String subPackage, String className, String content) throws IOException {
+        String packagePath = featurePackage().replace('.', '/') + "/" + subPackage;
+        Path dir = Paths.get(outputDir, packagePath);
+        Files.createDirectories(dir);
+
+        Path file = dir.resolve(className + ".java");
+        Files.writeString(file, content);
+        System.out.println("✅ Created: " + file);
+    }
+
+    private String ensureSuffix(String name, String suffix) {
+        return name.endsWith(suffix) ? name : name + suffix;
+    }
+
+    private String removeSuffix(String name, String suffix) {
+        return name.endsWith(suffix) ? name.substring(0, name.length() - suffix.length()) : name;
+    }
+
+    private String capitalize(String str) {
+        if (str == null || str.isEmpty())
+            return str;
+        return Character.toUpperCase(str.charAt(0)) + str.substring(1);
+    }
+}

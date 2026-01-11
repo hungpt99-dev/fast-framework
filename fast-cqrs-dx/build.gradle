@@ -1,0 +1,23 @@
+plugins {
+    id 'java-library'
+}
+
+description = 'Fast Framework DX - CLI Code Generator and Convention Validation'
+
+dependencies {
+    // CLI Framework - Picocli
+    implementation 'info.picocli:picocli:4.7.5'
+    annotationProcessor 'info.picocli:picocli-codegen:4.7.5'
+    
+    // Architecture Testing - ArchUnit
+    api 'com.tngtech.archunit:archunit:1.2.1'
+    
+    // Spring context for @Component annotations
+    implementation 'org.springframework:spring-context'
+    
+    // Logging
+    implementation 'org.slf4j:slf4j-api'
+    
+    // Testing
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+}

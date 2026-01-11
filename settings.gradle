@@ -9,6 +9,7 @@ include 'fast-cqrs-concurrent'
 include 'fast-cqrs-event'
 include 'fast-cqrs-eventsourcing'
 include 'fast-cqrs-starter'
+include 'fast-cqrs-dx'
 
 
 
