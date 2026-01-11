@@ -6,27 +6,34 @@ Welcome to the Fast Framework documentation.
 
 | Document | Description |
 |----------|-------------|
-| [Getting Started](../README.md#getting-started) | Installation and setup |
+| [Getting Started](../README.md#quick-start) | Installation and setup |
 | [Architecture](architecture.md) | System design and flow |
 | [Configuration](configuration.md) | All configurable options |
 | [Troubleshooting](troubleshooting.md) | Common issues and solutions |
 
 ## Modules
 
-| Module | Documentation |
-|--------|---------------|
-| CQRS Controllers | [CQRS.md](CQRS.md) |
-| FastRepository | [REPOSITORY.md](REPOSITORY.md) |
-| Features (Caching, Retry, etc.) | [FEATURES.md](FEATURES.md) |
-| Domain Events | [EVENTS.md](EVENTS.md) |
+| Module | Package | Documentation |
+|--------|---------|---------------|
+| CQRS Controllers | `fast-cqrs-core` | [CQRS.md](CQRS.md) |
+| SQL Repositories | `fast-cqrs-sql` | [SQL.md](SQL.md) |
+| FastRepository | `fast-cqrs-sql` | [REPOSITORY.md](REPOSITORY.md) |
+| Event-Driven | `fast-cqrs-event` | [EVENTS.md](EVENTS.md) |
+| Event Sourcing | `fast-cqrs-eventsourcing` | [EVENTS.md](EVENTS.md) |
+| Virtual Threads | `fast-cqrs-concurrent` | [CONCURRENT.md](CONCURRENT.md) |
+| Logging & Tracing | `fast-cqrs-logging` | [LOGGING.md](LOGGING.md) |
+| Utilities | `fast-cqrs-util` | [UTIL.md](UTIL.md) |
+
+## Features
+
+| Feature | Documentation |
+|---------|---------------|
+| Caching, Retry, Metrics | [FEATURES.md](FEATURES.md) |
 | Security & Authorization | [SECURITY.md](SECURITY.md) |
-| SQL Repositories | [SQL.md](SQL.md) |
-| Logging & Tracing | [LOGGING.md](LOGGING.md) |
-| Utilities | [UTIL.md](UTIL.md) |
 
 ## Examples
 
-See [examples.md](examples.md) for complete working examples.
+See [EXAMPLE.md](EXAMPLE.md) for complete working examples.
 
 ## Contributing
 

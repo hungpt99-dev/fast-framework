@@ -2,9 +2,9 @@ package com.example.order.aggregate;
 
 import com.example.order.event.OrderCreatedEvent;
 import com.example.order.event.OrderShippedEvent;
-import com.fast.cqrs.event.Aggregate;
-import com.fast.cqrs.event.ApplyEvent;
-import com.fast.cqrs.event.EventSourced;
+import com.fast.cqrs.eventsourcing.Aggregate;
+import com.fast.cqrs.eventsourcing.ApplyEvent;
+import com.fast.cqrs.eventsourcing.EventSourced;
 
 import java.math.BigDecimal;
 

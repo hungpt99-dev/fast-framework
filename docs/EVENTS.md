@@ -1,108 +1,94 @@
-# Event Sourcing
+# Events & Event Sourcing
 
-## Overview
+## Modules
 
-Event sourcing stores all changes as a sequence of events instead of just the current state. This enables:
-- Complete audit trail
-- Time travel (rebuild past states)
-- Event replay for debugging
-- CQRS pattern support
+| Module | Package | Use Case |
+|--------|---------|----------|
+| `fast-cqrs-event` | `com.fast.cqrs.event` | Lightweight event publishing |
+| `fast-cqrs-eventsourcing` | `com.fast.cqrs.eventsourcing` | Full event sourcing |
 
-## Quick Start
+---
 
-### 1. Define Events
+## Event-Driven (Lightweight)
+
+### Define Events
 
 ```java
+import com.fast.cqrs.event.DomainEvent;
+
 public class OrderCreatedEvent extends DomainEvent {
     private final String customerId;
-    private final BigDecimal total;
     
-    public OrderCreatedEvent(String aggregateId, String customerId, BigDecimal total) {
+    public OrderCreatedEvent(String aggregateId, String customerId) {
         super(aggregateId);
         this.customerId = customerId;
-        this.total = total;
-    }
-    // getters...
-}
-
-public class OrderShippedEvent extends DomainEvent {
-    public OrderShippedEvent(String aggregateId) {
-        super(aggregateId);
     }
 }
 ```
 
-### 2. Create Aggregate
+### Publish & Handle
 
 ```java
+// Publish
+@Autowired EventBus eventBus;
+eventBus.publish(new OrderCreatedEvent(orderId, customerId));
+
+// Handle
+@Component
+public class OrderCreatedHandler implements DomainEventHandler<OrderCreatedEvent> {
+    @Override
+    public void handle(OrderCreatedEvent event) {
+        // Send email, update read model
+    }
+}
+```
+
+---
+
+## Event Sourcing (Full)
+
+### Aggregate
+
+```java
+import com.fast.cqrs.eventsourcing.*;
+
 @EventSourced
 public class OrderAggregate extends Aggregate {
     private String status;
-    private String customerId;
-    private BigDecimal total;
 
-    public void create(String customerId, BigDecimal total) {
-        apply(new OrderCreatedEvent(getId(), customerId, total));
-    }
-
-    public void ship() {
-        if (!"PAID".equals(status)) {
-            throw new IllegalStateException("Order must be paid first");
-        }
-        apply(new OrderShippedEvent(getId()));
+    public void create(String customerId) {
+        apply(new OrderCreatedEvent(getId(), customerId));
     }
 
     @ApplyEvent
     private void on(OrderCreatedEvent event) {
         this.status = "CREATED";
-        this.customerId = event.getCustomerId();
-        this.total = event.getTotal();
-    }
-
-    @ApplyEvent
-    private void on(OrderShippedEvent event) {
-        this.status = "SHIPPED";
     }
 }
 ```
 
-### 3. Use Repository
+### Repository
 
 ```java
-@Service
-public class OrderService {
-    
-    private final AggregateRepository<OrderAggregate> orderRepository;
+AggregateRepository<OrderAggregate> repo = new AggregateRepository<>(
+    eventStore, eventBus, OrderAggregate.class
+);
 
-    public OrderService(EventStore eventStore, EventBus eventBus) {
-        this.orderRepository = new AggregateRepository<>(eventStore, eventBus, OrderAggregate.class);
-    }
-
-    public String createOrder(String customerId, BigDecimal total) {
-        OrderAggregate order = new OrderAggregate();
-        order.create(customerId, total);
-        orderRepository.save(order);
-        return order.getId();
-    }
-
-    public void shipOrder(String orderId) {
-        OrderAggregate order = orderRepository.load(orderId);
-        order.ship();
-        orderRepository.save(order);
-    }
-}
+// Load and modify
+OrderAggregate order = repo.load(orderId);
+order.ship();
+repo.save(order);
 ```
 
-## Event Stores
+### Event Stores
 
 | Store | Use Case |
 |-------|----------|
-| `InMemoryEventStore` | Testing, development |
-| `JdbcEventStore` | Production with SQL database |
-| `RedisEventStore` | Distributed, high-performance |
+| `InMemoryEventStore` | Testing |
+| `JdbcEventStore` | SQL database |
+| `RedisEventStore` | Distributed |
 
-### JdbcEventStore Setup
-
+**JDBC Setup:**
 ```sql
 CREATE TABLE event_store (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -110,8 +96,7 @@ CREATE TABLE event_store (
     event_type VARCHAR(255) NOT NULL,
     event_data TEXT NOT NULL,
     version BIGINT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_aggregate_id (aggregate_id)
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 ```
 
@@ -122,11 +107,14 @@ public EventStore eventStore(JdbcTemplate jdbcTemplate) {
 }
 ```
 
-## Async Event Bus
+---
+
+## Event Bus
 
 ```java
-@Bean
-public EventBus eventBus() {
-    return new AsyncEventBus(); // Non-blocking
-}
+// Sync
+EventBus eventBus = new SimpleEventBus();
+
+// Async (recommended)
+EventBus eventBus = new AsyncEventBus();
 ```
