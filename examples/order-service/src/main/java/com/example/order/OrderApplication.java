@@ -1,25 +1,21 @@
 package com.example.order;
 
-import com.fast.cqrs.autoconfigure.EnableCqrs;
+import com.fast.cqrs.autoconfigure.EnableFast;
 import com.fast.cqrs.event.AsyncEventBus;
 import com.fast.cqrs.event.EventBus;
 import com.fast.cqrs.eventsourcing.EventStore;
 import com.fast.cqrs.eventsourcing.InMemoryEventStore;
-import com.fast.cqrs.sql.autoconfigure.EnableSqlRepositories;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
 
 /**
- * Example application demonstrating all Fast Framework features:
- * - CQRS Controllers
- * - SQL Repositories
- * - Event-Driven & Event Sourcing
- * - Virtual Threads
+ * Example application demonstrating all Fast Framework features.
+ * 
+ * Uses @EnableFast for zero-config setup with convention-based scanning.
  */
 @SpringBootApplication
-@EnableCqrs(basePackages = "com.example.order.controller")
-@EnableSqlRepositories(basePackages = "com.example.order.repository")
+@EnableFast  // Single annotation - enables CQRS, SQL, Events, etc.
 public class OrderApplication {
 
     public static void main(String[] args) {
