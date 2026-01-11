@@ -174,16 +174,33 @@ class FeatureGenerator {
                 import com.fast.cqrs.annotation.Command;
                 import org.springframework.web.bind.annotation.*;
 
+                import java.util.List;
+
                 /**
                  * REST API controller for %s feature.
+                 * <p>
+                 * Query endpoints use @ModelAttribute to bind query parameters.
+                 * Handler is optional - if not specified, QueryBus auto-dispatches
+                 * based on the query type.
                  */
                 @HttpController
                 @RequestMapping("/api/%s")
                 public interface %s {
 
+                    /**
+                     * Get single %s by ID.
+                     * Handler is optional - QueryBus will find handler by query type.
+                     */
                     @Query
                     @GetMapping("/{id}")
-                    %sDto get%s(@PathVariable String id);
+                    %sDto get%s(@PathVariable String id, @ModelAttribute Get%sQuery query);
+
+                    /**
+                     * List %s with pagination and filters.
+                     */
+                    @Query
+                    @GetMapping
+                    List<%sDto> list%s(@ModelAttribute List%sQuery query);
 
                     @Command
                     @PostMapping
@@ -202,7 +219,10 @@ class FeatureGenerator {
                 entityName,
                 feature + "s",
                 className,
-                entityName, entityName,
+                entityName,
+                entityName, entityName, entityName,
+                entityName,
+                entityName, entityName, entityName,
                 entityName, entityName,
                 entityName, entityName,
                 entityName);
@@ -448,6 +468,134 @@ class FeatureGenerator {
         }
     }
 
+    void generateQuery(String name) throws IOException {
+        String queryClassName = ensureSuffix(name, "Query");
+        String queryContent = """
+                package %s.api;
+
+                /**
+                 * Query DTO for %s.
+                 * Use @ModelAttribute to bind query parameters.
+                 */
+                public record %s(
+                    Integer page,
+                    Integer size,
+                    String sort,
+                    String filter
+                ) {
+                    public %s {
+                        if (page == null) page = 0;
+                        if (size == null) size = 20;
+                    }
+                }
+                """.formatted(featurePackage(), name, queryClassName, queryClassName);
+        writeFile("api", queryClassName, queryContent);
+    }
+
+    void generateQueryHandler(String name) throws IOException {
+        String className = ensureSuffix(name, "Handler");
+        String queryName = removeSuffix(name, "Handler");
+        String entityName = deriveEntityName(queryName);
+
+        String content = """
+                package %s.application;
+
+                import %s.api.%sQuery;
+                import %s.api.%sDto;
+                import %s.infrastructure.%sRepository;
+                import com.fast.cqrs.handler.QueryHandler;
+                import org.springframework.stereotype.Component;
+
+                /**
+                 * Handler for %s query.
+                 */
+                @Component
+                public class %s implements QueryHandler<%sQuery, %sDto> {
+
+                    private final %sRepository repository;
+
+                    public %s(%sRepository repository) {
+                        this.repository = repository;
+                    }
+
+                    @Override
+                    public %sDto handle(%sQuery query) {
+                        // TODO: Implement query logic
+                        return null;
+                    }
+                }
+                """.formatted(
+                featurePackage(),
+                featurePackage(), queryName,
+                featurePackage(), entityName,
+                featurePackage(), entityName,
+                queryName,
+                className, queryName, entityName,
+                entityName,
+                className, entityName,
+                entityName, queryName);
+
+        writeFile("application", className, content);
+    }
+
+    void generateListQueryHandler(String name) throws IOException {
+        String className = "List" + name + "Handler";
+        String queryName = "List" + name;
+
+        String content = """
+                package %s.application;
+
+                import %s.api.%sQuery;
+                import %s.api.%sDto;
+                import %s.infrastructure.%sRepository;
+                import com.fast.cqrs.handler.QueryHandler;
+                import org.springframework.stereotype.Component;
+
+                import java.util.List;
+
+                /**
+                 * Handler for %s query.
+                 */
+                @Component
+                public class %s implements QueryHandler<%sQuery, List<%sDto>> {
+
+                    private final %sRepository repository;
+
+                    public %s(%sRepository repository) {
+                        this.repository = repository;
+                    }
+
+                    @Override
+                    public List<%sDto> handle(%sQuery query) {
+                        // TODO: Implement query logic
+                        return List.of();
+                    }
+                }
+                """.formatted(
+                featurePackage(),
+                featurePackage(), queryName,
+                featurePackage(), name,
+                featurePackage(), name,
+                queryName,
+                className, queryName, name,
+                name,
+                className, name,
+                name, queryName);
+
+        writeFile("application", className, content);
+    }
+
+    private String deriveEntityName(String queryName) {
+        // Remove prefixes like Get, List, Find
+        String[] prefixes = { "Get", "List", "Find" };
+        for (String prefix : prefixes) {
+            if (queryName.startsWith(prefix) && queryName.length() > prefix.length()) {
+                return queryName.substring(prefix.length());
+            }
+        }
+        return queryName;
+    }
+
     void generateAll(String name) throws IOException {
         String entityName = capitalize(name);
 
@@ -460,16 +608,26 @@ class FeatureGenerator {
         generateAggregate(entityName);
         generateEvent(entityName + "Created");
 
-        // API layer
-        generateController(entityName);
+        // API layer - DTOs
         generateDto("Create" + entityName);
         generateDto("Update" + entityName);
         generateDto(entityName);
 
-        // Application layer
+        // API layer - Query DTOs
+        generateQuery("Get" + entityName);
+        generateQuery("List" + entityName);
+
+        // API layer - Controller (after DTOs and Queries are generated)
+        generateController(entityName);
+
+        // Application layer - Command handlers
         generateHandler("Create" + entityName);
         generateHandler("Update" + entityName);
         generateHandler("Delete" + entityName);
+
+        // Application layer - Query handlers
+        generateQueryHandler("Get" + entityName);
+        generateListQueryHandler(entityName);
 
         // Infrastructure layer
         generateRepository(entityName);
@@ -479,9 +637,9 @@ class FeatureGenerator {
         System.out.println();
         System.out.println("Structure:");
         System.out.println("  " + featurePackage() + "/");
-        System.out.println("  ├── api/           # Controllers, DTOs");
+        System.out.println("  ├── api/           # Controllers, DTOs, Queries");
         System.out.println("  ├── domain/        # Entities, Aggregates, Events");
-        System.out.println("  ├── application/   # Handlers");
+        System.out.println("  ├── application/   # Command & Query Handlers");
         System.out.println("  └── infrastructure/ # Repositories");
     }
 
