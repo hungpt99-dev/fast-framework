@@ -1,6 +1,6 @@
 package com.example.order.repository;
 
-import com.example.order.dto.OrderDto;
+import com.example.order.entity.Order;
 import com.fast.cqrs.sql.annotation.Param;
 import com.fast.cqrs.sql.annotation.Select;
 import com.fast.cqrs.sql.annotation.SqlRepository;
@@ -15,14 +15,14 @@ import java.util.List;
  * No implementation needed - the framework creates a dynamic proxy at runtime.
  */
 @SqlRepository
-public interface OrderRepository extends FastRepository<OrderDto, String> {
+public interface OrderRepository extends FastRepository<Order, String> {
 
     // CRUD methods from FastRepository:
     // - findById(String id) 
     // - findAll()
-    // - save(OrderDto entity)
-    // - saveAll(List<OrderDto> entities)
-    // - updateAll(List<OrderDto> entities)
+    // - save(Order entity)
+    // - saveAll(List<Order> entities)
+    // - updateAll(List<Order> entities)
     // - deleteById(String id)
     // - deleteAllById(List<String> ids)
     // - existsById(String id)
@@ -31,8 +31,8 @@ public interface OrderRepository extends FastRepository<OrderDto, String> {
 
     // Custom queries:
     @Select("SELECT * FROM orders WHERE customer_id = :customerId")
-    List<OrderDto> findByCustomerId(@Param("customerId") String customerId);
+    List<Order> findByCustomerId(@Param("customerId") String customerId);
 
     @Select("SELECT * FROM orders WHERE status = :status")
-    List<OrderDto> findByStatus(@Param("status") String status);
+    List<Order> findByStatus(@Param("status") String status);
 }

@@ -26,6 +26,9 @@ import java.util.List;
  * - @RetryCommand for retry
  * - @Metrics for observability
  * - @Valid for validation
+ * 
+ * Entity: Order (database)
+ * DTO: OrderDto (API response)
  */
 @HttpController
 @RequestMapping("/api/orders")

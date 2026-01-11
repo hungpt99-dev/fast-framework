@@ -2,11 +2,34 @@
 
 A full example showing all framework features working together.
 
+## Project Structure
+
+```
+order-service/
+├── aggregate/
+│   └── OrderAggregate.java      # Event-sourced aggregate
+├── controller/
+│   └── OrderController.java     # CQRS controller
+├── dto/
+│   ├── CreateOrderCmd.java      # Command
+│   ├── GetOrderQuery.java       # Query
+│   └── OrderDto.java            # Entity with @Table
+├── event/
+│   ├── OrderCreatedEvent.java   # Domain event
+│   ├── OrderCreatedHandler.java # Event handler
+│   └── OrderShippedEvent.java   # Domain event
+├── handler/
+│   ├── CreateOrderHandler.java  # Command handler
+│   └── GetOrderHandler.java     # Query handler
+└── repository/
+    └── OrderRepository.java     # FastRepository
+```
+
 ## Entity
 
 ```java
 @Table("orders")
-public class Order {
+public class OrderDto {
     @Id
     private String id;
 
@@ -17,48 +40,23 @@ public class Order {
     private String status;
 
     @Column("created_at")
-    private LocalDateTime createdAt;
+    private String createdAt;
 }
 ```
 
-## DTOs / Commands / Queries
-
-```java
-public record OrderDto(
-    String id,
-    String customerId,
-    BigDecimal total,
-    String status,
-    String createdAt
-) {}
-
-public record CreateOrderCmd(
-    @NotBlank String customerId,
-    @NotNull @Min(1) BigDecimal total
-) {}
-
-public record GetOrderQuery(String id) {}
-```
-
-## Repository
+## Repository (CRUD + Custom)
 
 ```java
 @SqlRepository
-public interface OrderRepository extends FastRepository<Order, String> {
-    // CRUD methods work automatically!
-    // - findById(id)
-    // - findAll()
-    // - save(entity)
-    // - saveAll(entities)
-    // - deleteById(id)
+public interface OrderRepository extends FastRepository<OrderDto, String> {
+    // Auto: findById, findAll, save, saveAll, updateAll, deleteById, etc.
 
-    // Custom queries:
     @Select("SELECT * FROM orders WHERE customer_id = :customerId")
-    List<Order> findByCustomerId(@Param("customerId") String customerId);
+    List<OrderDto> findByCustomerId(@Param("customerId") String customerId);
 }
 ```
 
-## Controller
+## Controller with Annotations
 
 ```java
 @HttpController
@@ -79,38 +77,20 @@ public interface OrderController {
 }
 ```
 
-## Handlers
+## Event-Sourced Aggregate
 
 ```java
-@Component
-public class GetOrderHandler implements QueryHandler<GetOrderQuery, OrderDto> {
+@EventSourced
+public class OrderAggregate extends Aggregate {
+    private String status;
 
-    private final OrderRepository repository;
-
-    @Override
-    public OrderDto handle(GetOrderQuery query) {
-        return repository.findById(query.id())
-            .map(this::toDto)
-            .orElse(null);
+    public void create(String customerId, BigDecimal total) {
+        apply(new OrderCreatedEvent(getId(), customerId, total));
     }
-}
 
-@Component
-public class CreateOrderHandler implements CommandHandler<CreateOrderCmd> {
-
-    private final OrderRepository repository;
-    private final EventBus eventBus;
-
-    @Override
-    public void handle(CreateOrderCmd cmd) {
-        Order order = new Order();
-        order.setId(UUID.randomUUID().toString());
-        order.setCustomerId(cmd.customerId());
-        order.setTotal(cmd.total());
-        order.setStatus("PENDING");
-        
-        repository.save(order);
-        eventBus.publish(new OrderCreatedEvent(order.getId()));
+    @ApplyEvent
+    private void on(OrderCreatedEvent event) {
+        this.status = "CREATED";
     }
 }
 ```
@@ -119,39 +99,45 @@ public class CreateOrderHandler implements CommandHandler<CreateOrderCmd> {
 
 ```java
 @Component
-public class OrderCreatedHandler implements EventHandler<OrderCreatedEvent> {
-
+public class OrderCreatedHandler implements DomainEventHandler<OrderCreatedEvent> {
     @Override
     public void handle(OrderCreatedEvent event) {
-        log.info("Order created: {}", event.getOrderId());
-        // Send notification, update analytics, etc.
+        log.info("Order created: {}", event.getAggregateId());
+        // Send email, update analytics, etc.
     }
 }
 ```
 
-## Application
+## Configuration
 
 ```java
 @SpringBootApplication
-@EnableCqrs(basePackages = "com.example.controller")
-@EnableSqlRepositories(basePackages = "com.example.repository")
+@EnableCqrs(basePackages = "com.example.order.controller")
+@EnableSqlRepositories(basePackages = "com.example.order.repository")
 public class OrderApplication {
-    public static void main(String[] args) {
-        SpringApplication.run(OrderApplication.class, args);
+    
+    @Bean
+    public EventStore eventStore() {
+        return new InMemoryEventStore();
+    }
+    
+    @Bean
+    public EventBus eventBus() {
+        return new AsyncEventBus();
     }
 }
 ```
 
-## API Requests
+## Features Used
 
-```bash
-# Create order
-curl -X POST http://localhost:8080/api/orders \
-  -H "Content-Type: application/json" \
-  -d '{"customerId": "C001", "total": 99.99}'
-
-# Get order
-curl -X POST http://localhost:8080/api/orders/get \
-  -H "Content-Type: application/json" \
-  -d '{"id": "ORD-001"}'
-```
+| Feature | Annotation/Class |
+|---------|------------------|
+| CQRS | `@Query`, `@Command` |
+| Repository | `FastRepository`, `@Table`, `@Id` |
+| Batch | `saveAll()`, `updateAll()` |
+| Caching | `@CacheableQuery` |
+| Retry | `@RetryCommand` |
+| Metrics | `@Metrics` |
+| Validation | `@Valid` |
+| Event Sourcing | `Aggregate`, `@ApplyEvent` |
+| Event Bus | `EventBus`, `DomainEventHandler` |
