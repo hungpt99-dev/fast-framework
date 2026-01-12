@@ -26,10 +26,9 @@ dependencies {
     runtimeOnly 'com.h2database:h2'
     
     // Testing
-    testImplementation 'org.springframework.boot:spring-boot-starter-test:4.0.0'
-    testImplementation 'org.springframework.boot:spring-boot-test:4.0.0'
-    testImplementation 'org.springframework.boot:spring-boot-test-autoconfigure:4.0.0'
-    testImplementation 'com.fasterxml.jackson.core:jackson-databind' // Should be managed by BOM
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.boot:spring-boot-test-autoconfigure'
+    testImplementation 'com.fasterxml.jackson.core:jackson-databind'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 

@@ -2,6 +2,7 @@ package com.example.order.aggregate;
 
 import com.example.order.event.OrderCreatedEvent;
 import com.example.order.event.OrderShippedEvent;
+import com.example.order.event.OrderPaidEvent;
 import com.fast.cqrs.eventsourcing.Aggregate;
 import com.fast.cqrs.eventsourcing.ApplyEvent;
 import com.fast.cqrs.eventsourcing.EventSourced;
@@ -55,11 +56,16 @@ public class OrderAggregate extends Aggregate {
         if (!"CREATED".equals(status)) {
             throw new IllegalStateException("Invalid state for payment");
         }
+        apply(new OrderPaidEvent(getId()));
+    }
+
+    @ApplyEvent
+    private void on(OrderPaidEvent event) {
         this.status = "PAID";
     }
 
     // Event handlers - update state based on events
-    
+
     @ApplyEvent
     private void on(OrderCreatedEvent event) {
         this.status = "CREATED";
@@ -73,7 +79,15 @@ public class OrderAggregate extends Aggregate {
     }
 
     // Getters
-    public String getStatus() { return status; }
-    public String getCustomerId() { return customerId; }
-    public BigDecimal getTotal() { return total; }
+    public String getStatus() {
+        return status;
+    }
+
+    public String getCustomerId() {
+        return customerId;
+    }
+
+    public BigDecimal getTotal() {
+        return total;
+    }
 }

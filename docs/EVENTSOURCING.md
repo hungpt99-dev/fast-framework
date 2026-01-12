@@ -5,7 +5,9 @@ Comprehensive event sourcing framework for Spring Boot applications.
 ## Installation
 
 ```groovy
-implementation 'com.fast:fast-cqrs-eventsourcing:1.0.0-SNAPSHOT'
+implementation 'com.fast:fast-cqrs-starter:1.0.0-SNAPSHOT'
+// OR
+implementation 'com.fast:fast-cqrs-core:1.0.0-SNAPSHOT'
 ```
 
 ---

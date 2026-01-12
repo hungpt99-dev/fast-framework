@@ -112,8 +112,7 @@ public class OrderCreatedHandler implements DomainEventHandler<OrderCreatedEvent
 
 ```java
 @SpringBootApplication
-@EnableCqrs(basePackages = "com.example.order.controller")
-@EnableSqlRepositories(basePackages = "com.example.order.repository")
+@EnableFast
 public class OrderApplication {
     
     @Bean
@@ -124,6 +123,10 @@ public class OrderApplication {
     @Bean
     public EventBus eventBus() {
         return new AsyncEventBus();
+    }
+
+    public static void main(String[] args) {
+        SpringApplication.run(OrderApplication.class, args);
     }
 }
 ```

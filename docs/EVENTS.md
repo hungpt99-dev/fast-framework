@@ -4,8 +4,8 @@
 
 | Module | Package | Use Case |
 |--------|---------|----------|
-| `fast-cqrs-event` | `com.fast.cqrs.event` | Lightweight event publishing |
-| `fast-cqrs-eventsourcing` | `com.fast.cqrs.eventsourcing` | Full event sourcing |
+| `fast-cqrs-core` | `com.fast.cqrs.event` | Lightweight event publishing |
+| `fast-cqrs-core` | `com.fast.cqrs.eventsourcing` | Full event sourcing |
 
 ---
 

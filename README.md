@@ -29,10 +29,8 @@ public class Application {
 
 | Module | Description |
 |--------|-------------|
-| `fast-cqrs-core` | CQRS annotations, buses, handlers |
+| `fast-cqrs-core` | CQRS annotations, buses, handlers, events, event sourcing |
 | `fast-cqrs-sql` | SQL repositories with `FastRepository` |
-| `fast-cqrs-event` | Event-driven infrastructure |
-| `fast-cqrs-eventsourcing` | Full event sourcing support |
 | `fast-cqrs-concurrent` | Virtual Thread utilities |
 | `fast-cqrs-logging` | Automatic tracing and logging |
 | `fast-cqrs-dx` | CLI code generator and convention validation |
@@ -164,10 +162,8 @@ FlowResult result = ParallelFlow.of()
 | Module | When to Use |
 |--------|-------------|
 | `fast-cqrs-starter` | All-in-one (recommended) |
-| `fast-cqrs-core` | Just CQRS controllers |
+| `fast-cqrs-core` | CQRS, Events, Event Sourcing |
 | `fast-cqrs-sql` | SQL repositories |
-| `fast-cqrs-event` | Lightweight events only |
-| `fast-cqrs-eventsourcing` | Full event sourcing |
 | `fast-cqrs-dx` | Developer Experience (CLI, Conventions) |
 | `fast-cqrs-concurrent` | Virtual Thread utilities |
 

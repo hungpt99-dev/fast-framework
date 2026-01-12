@@ -18,8 +18,8 @@ Welcome to the Fast Framework documentation.
 | CQRS Controllers | `fast-cqrs-core` | [CQRS.md](CQRS.md) |
 | SQL Repositories | `fast-cqrs-sql` | [SQL.md](SQL.md) |
 | FastRepository | `fast-cqrs-sql` | [REPOSITORY.md](REPOSITORY.md) |
-| Event-Driven | `fast-cqrs-event` | [EVENTS.md](EVENTS.md) |
-| Event Sourcing | `fast-cqrs-eventsourcing` | [EVENTS.md](EVENTS.md) |
+| Event-Driven | `fast-cqrs-core` | [EVENTS.md](EVENTS.md) |
+| Event Sourcing | `fast-cqrs-core` | [EVENTS.md](EVENTS.md) |
 | Virtual Threads | `fast-cqrs-concurrent` | [CONCURRENT.md](CONCURRENT.md) |
 | Logging & Tracing | `fast-cqrs-logging` | [LOGGING.md](LOGGING.md) |
 | Utilities | `fast-cqrs-util` | [UTIL.md](UTIL.md) |

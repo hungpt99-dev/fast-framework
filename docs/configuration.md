@@ -2,31 +2,27 @@
 
 ## Enable Annotations
 
-### @EnableCqrs
-
-Enables CQRS controller scanning and registration.
-
+### @EnableFast
+ 
+Single annotation to enable all framework features (CQRS, SQL Repositories, etc.).
+ 
 ```java
-@EnableCqrs(basePackages = "com.example.controller")
+@EnableFast
+// OR with options
+@EnableFast(basePackages = "com.example", strict = true)
 ```
-
-| Attribute | Required | Description |
-|-----------|----------|-------------|
-| `basePackages` | No | Packages to scan for @HttpController interfaces |
-| `basePackageClasses` | No | Type-safe alternative to basePackages |
-
-### @EnableSqlRepositories
-
-Enables SQL repository scanning and registration.
-
-```java
-@EnableSqlRepositories(basePackages = "com.example.repository")
-```
-
-| Attribute | Required | Description |
-|-----------|----------|-------------|
-| `basePackages` | No | Packages to scan for @SqlRepository interfaces |
-| `basePackageClasses` | No | Type-safe alternative to basePackages |
+ 
+| Attribute | Default | Description |
+|-----------|---------|-------------|
+| `basePackages` | Annotated class package | Packages to scan for conventions |
+| `strict` | `false` | Throw exception on convention violations |
+ 
+### Fine-Grained Annotations
+ 
+If you prefer manual control, you can use these individual annotations instead of `@EnableFast`:
+ 
+- `@EnableCqrs(basePackages = "...")`
+- `@EnableSqlRepositories(basePackages = "...")`
 
 ---
 
