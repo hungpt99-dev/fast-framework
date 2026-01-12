@@ -6,8 +6,6 @@ include 'fast-cqrs-sql'
 include 'fast-cqrs-logging'
 include 'fast-cqrs-util'
 include 'fast-cqrs-concurrent'
-include 'fast-cqrs-event'
-include 'fast-cqrs-eventsourcing'
 include 'fast-cqrs-starter'
 include 'fast-cqrs-dx'
 

@@ -5,7 +5,7 @@ plugins {
 description = 'Fast Framework Starter - All-in-one dependency for the complete framework'
 
 dependencies {
-    // Core CQRS Framework
+    // Core CQRS Framework (includes Event + Event Sourcing)
     api project(':fast-cqrs-core')
     api project(':fast-cqrs-autoconfigure')
     
@@ -20,12 +20,6 @@ dependencies {
     
     // Concurrent (Virtual Threads)
     api project(':fast-cqrs-concurrent')
-    
-    // Event-Driven
-    api project(':fast-cqrs-event')
-    
-    // Event Sourcing
-    api project(':fast-cqrs-eventsourcing')
     
     // Developer Experience (CLI, Conventions)
     api project(':fast-cqrs-dx')
