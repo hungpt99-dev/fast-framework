@@ -6,23 +6,23 @@ description = 'Fast Framework Starter - All-in-one dependency for the complete f
 
 dependencies {
     // Core CQRS Framework (includes Event + Event Sourcing)
-    api project(':fast-cqrs-core')
-    api project(':fast-cqrs-autoconfigure')
+    api project(':fast-core')
+    api project(':fast-autoconfigure')
     
     // SQL Repository
-    api project(':fast-cqrs-sql')
+    api project(':fast-sql')
     
     // Logging & Tracing
-    api project(':fast-cqrs-logging')
+    api project(':fast-logging')
     
     // Utilities
-    api project(':fast-cqrs-util')
+    api project(':fast-util')
     
     // Concurrent (Virtual Threads)
-    api project(':fast-cqrs-concurrent')
+    api project(':fast-concurrent')
     
     // Developer Experience (CLI, Conventions)
-    api project(':fast-cqrs-dx')
+    api project(':fast-dx')
     
     // Spring Boot Starter Web (common dependency)
     api 'org.springframework.boot:spring-boot-starter-web'

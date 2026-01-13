@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-**fast-cqrs-core**
+**fast-core**
 - `@HttpController` annotation for interface-only controllers
 - `@Query` and `@Command` annotations for CQRS enforcement
 - `CommandBus` and `QueryBus` interfaces with default implementations
@@ -19,33 +19,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `CqrsDispatcher` for routing and validation
 - Dynamic proxy support via `ControllerProxyFactory`
 
-**fast-cqrs-autoconfigure**
+**fast-autoconfigure**
 - `@EnableCqrs` annotation for enabling framework
 - Spring Boot 4 auto-configuration
 - Classpath scanning for controller interfaces
 
-**fast-cqrs-modal**
+**fast-modal**
 - `@Modal` class-level annotation
 - `@ModalField` field-level annotation with name, ignore, format options
 - `ModalMapper` for entity to Map conversion
 - Nested object and collection support
 - Field metadata caching for performance
 
-**fast-cqrs-sql**
+**fast-sql**
 - `@SqlRepository` annotation for interface-only repositories
 - `@Select` and `@Execute` SQL annotations
 - `@Param` for named parameter binding
 - Spring JDBC integration with `NamedParameterJdbcTemplate`
 - `@EnableSqlRepositories` annotation
 
-**fast-cqrs-logging**
+**fast-logging**
 - `TraceIdFilter` for MDC trace context
 - `@TraceLog` annotation for method timing
 - `@Loggable` annotation for business events
 - `FrameworkExceptionHandler` for global exception handling
 - `SafeLogUtil` for sensitive data masking
 
-**fast-cqrs-util**
+**fast-util**
 - `StringUtil` - String manipulation utilities
 - `DateUtil` - Date/time utilities
 - `IdGenerator` - ID generation utilities

@@ -85,5 +85,5 @@ All modules provide Spring Boot auto-configuration. Features are enabled automat
 
 | Module | Auto-enabled when |
 |--------|-------------------|
-| `fast-cqrs-logging` | Web application context detected |
-| `fast-cqrs-sql` | DataSource bean present |
+| `fast-logging` | Web application context detected |
+| `fast-sql` | DataSource bean present |

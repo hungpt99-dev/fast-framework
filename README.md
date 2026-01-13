@@ -1,4 +1,4 @@
-# Fast CQRS Framework
+# Fast Framework
 
 This internal framework is built on top of **Spring Boot** with the goal of **standardizing code quality across teams with different experience levels**, while keeping the system **explicit, predictable, and easy to maintain**.
 
@@ -81,7 +81,7 @@ The framework focuses on **CQRS-first design**, enforcing a clear separation bet
 
 ```groovy
 dependencies {
-    implementation 'com.fast:fast-cqrs-starter:1.0.0-SNAPSHOT'
+    implementation 'com.fast:fast-starter:1.0.0-SNAPSHOT'
 }
 ```
 
@@ -156,12 +156,13 @@ User user = Tasks.supply("load-user", () -> userService.load(id))
 
 | Module | Purpose |
 |--------|---------|
-| `fast-cqrs-starter` | All-in-one dependency (Recommended) |
-| `fast-cqrs-core` | Core CQRS patterns (Command/Query buses) |
-| `fast-cqrs-sql` | explicit SQL repositories |
-| `fast-cqrs-dx` | Developer Experience (CLI, convention enforcement) |
-| `fast-cqrs-logging` | Observability (Logging, tracing) |
-| `fast-cqrs-concurrent`| Virtual Thread structured concurrency |
+| `fast-starter` | All-in-one dependency (Recommended) |
+| `fast-core` | Core CQRS patterns (Command/Query buses) |
+| `fast-sql` | explicit SQL repositories |
+| `fast-dx` | Developer Experience (CLI, convention enforcement) |
+| `fast-logging` | Observability (Logging, tracing) |
+| `fast-concurrent`| Virtual Thread structured concurrency |
+| `fast-util` | Common utilities |
 
 ---
 

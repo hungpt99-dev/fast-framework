@@ -20,7 +20,7 @@ repositories {
 
 dependencies {
     // Fast Framework - All-in-One
-    implementation 'com.fast:fast-cqrs-starter:1.0.0-SNAPSHOT'
+    implementation 'com.fast:fast-starter:1.0.0-SNAPSHOT'
     
     // H2 Database for demo
     runtimeOnly 'com.h2database:h2'

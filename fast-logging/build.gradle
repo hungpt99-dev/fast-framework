@@ -6,7 +6,7 @@ description = 'CQRS Logging Framework - Tracing, MDC, and Exception Handling'
 
 dependencies {
     // Core module for CommandBus interface
-    api project(':fast-cqrs-core')
+    api project(':fast-core')
     
     // Spring Web for filters and exception handling
     api 'org.springframework:spring-web'

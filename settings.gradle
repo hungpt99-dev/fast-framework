@@ -1,13 +1,14 @@
-rootProject.name = 'fast-cqrs-framework'
+rootProject.name = 'fast-framework'
 
-include 'fast-cqrs-core'
-include 'fast-cqrs-autoconfigure'
-include 'fast-cqrs-sql'
-include 'fast-cqrs-logging'
-include 'fast-cqrs-util'
-include 'fast-cqrs-concurrent'
-include 'fast-cqrs-starter'
-include 'fast-cqrs-dx'
+include 'fast-core'
+include 'fast-autoconfigure'
+include 'fast-sql'
+include 'fast-logging'
+include 'fast-util'
+include 'fast-concurrent'
+include 'fast-starter'
+include 'fast-dx'
+
 
 
 

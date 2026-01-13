@@ -15,13 +15,13 @@ Welcome to the Fast Framework documentation.
 
 | Module | Package | Documentation |
 |--------|---------|---------------|
-| CQRS Controllers | `fast-cqrs-core` | [CQRS.md](CQRS.md) |
-| SQL Repositories | `fast-cqrs-sql` | [SQL.md](SQL.md) |
-| FastRepository | `fast-cqrs-sql` | [REPOSITORY.md](REPOSITORY.md) |
+| CQRS Controllers | `fast-core` | [CQRS.md](CQRS.md) |
+| SQL Repositories | `fast-sql` | [SQL.md](SQL.md) |
+| FastRepository | `fast-sql` | [REPOSITORY.md](REPOSITORY.md) |
 
-| Virtual Threads | `fast-cqrs-concurrent` | [CONCURRENT.md](CONCURRENT.md) |
-| Logging & Tracing | `fast-cqrs-logging` | [LOGGING.md](LOGGING.md) |
-| Utilities | `fast-cqrs-util` | [UTIL.md](UTIL.md) |
+| Virtual Threads | `fast-concurrent` | [CONCURRENT.md](CONCURRENT.md) |
+| Logging & Tracing | `fast-logging` | [LOGGING.md](LOGGING.md) |
+| Utilities | `fast-util` | [UTIL.md](UTIL.md) |
 
 ## Features
 

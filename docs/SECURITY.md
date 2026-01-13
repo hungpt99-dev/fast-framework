@@ -224,7 +224,7 @@ Before deploying to production:
 - [ ] All commands have appropriate `@PreAuthorize` annotations
 - [ ] All request DTOs have validation annotations
 - [ ] Sensitive operations have audit logging
-- [ ] SQL repositories use parameterized queries (automatic in fast-cqrs-sql)
+- [ ] SQL repositories use parameterized queries (automatic in fast-sql)
 - [ ] Error responses don't leak sensitive information
 - [ ] CORS is properly configured
 - [ ] Rate limiting is in place for public APIs
