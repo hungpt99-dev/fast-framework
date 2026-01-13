@@ -2,7 +2,7 @@
 
 **Code fast. Run fast. Review fast.**
 
-`fast-framework` is an internal Java framework built on top of **Spring Boot**, designed to help teams **move quickly without losing control**, **maintain consistent code quality**, and **scale development across developers with different experience levels**.
+`fast-framework` is a Java framework built on top of **Spring Boot**, designed to help teams **move quickly without losing control**, **maintain consistent code quality**, and **scale development across developers with different experience levels**.
 
 The framework is built around **CQRS as a first-class architectural principle**, deliberately avoids **ORM magic**, and favors **explicit, predictable behavior**.
 The result is code that is **easy to write, easy to run, and easy to review**.
