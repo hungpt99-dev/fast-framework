@@ -4,18 +4,20 @@ import com.fast.cqrs.cqrs.context.QueryContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Default implementation of {@link QueryBus} with handler lifecycle support.
+ * High-performance implementation of {@link QueryBus}.
  * <p>
- * This implementation:
+ * Optimizations:
  * <ul>
- *   <li>Discovers all {@link QueryHandler} beans</li>
- *   <li>Routes queries to the appropriate handler</li>
- *   <li>Invokes lifecycle methods: preQuery → handle → postQuery</li>
+ *   <li>Skip lifecycle methods when using defaults (no overhead)</li>
+ *   <li>Lazy context creation only when needed</li>
+ *   <li>Minimal logging in hot path</li>
  * </ul>
  */
 public class DefaultQueryBus implements QueryBus {
@@ -23,19 +25,23 @@ public class DefaultQueryBus implements QueryBus {
     private static final Logger log = LoggerFactory.getLogger(DefaultQueryBus.class);
 
     private final Map<Class<?>, QueryHandler<?, ?>> handlers = new ConcurrentHashMap<>();
+    private final Set<Class<?>> hasCustomPreQuery = ConcurrentHashMap.newKeySet();
+    private final Set<Class<?>> hasCustomPostQuery = ConcurrentHashMap.newKeySet();
 
-    /**
-     * Creates a new DefaultQueryBus with the given handlers.
-     *
-     * @param handlerList the list of query handlers to register
-     */
     public DefaultQueryBus(List<QueryHandler<?, ?>> handlerList) {
         for (QueryHandler<?, ?> handler : handlerList) {
             Class<?> queryType = handler.getQueryType();
             if (queryType != null && queryType != Object.class) {
                 handlers.put(queryType, handler);
-                log.debug("Registered query handler: {} for type: {}", 
-                         handler.getClass().getSimpleName(), queryType.getSimpleName());
+                
+                // Detect custom lifecycle methods at startup
+                Class<?> handlerClass = handler.getClass();
+                if (hasOverriddenMethod(handlerClass, "preQuery")) {
+                    hasCustomPreQuery.add(queryType);
+                }
+                if (hasOverriddenMethod(handlerClass, "postQuery")) {
+                    hasCustomPostQuery.add(queryType);
+                }
             }
         }
         log.info("Initialized DefaultQueryBus with {} handlers", handlers.size());
@@ -44,39 +50,50 @@ public class DefaultQueryBus implements QueryBus {
     @Override
     @SuppressWarnings("unchecked")
     public <Q, R> R dispatch(Q query) {
-        if (query == null) {
-            throw new IllegalArgumentException("Query cannot be null");
-        }
-
         Class<?> queryType = query.getClass();
         QueryHandler<Q, R> handler = (QueryHandler<Q, R>) handlers.get(queryType);
 
         if (handler == null) {
-            throw new IllegalArgumentException(
-                "No handler found for query type: " + queryType.getName()
-            );
+            throw new IllegalArgumentException("No handler for: " + queryType.getName());
         }
 
-        log.debug("Dispatching query: {} to handler: {}", 
-                  queryType.getSimpleName(), handler.getClass().getSimpleName());
+        // Fast path: no lifecycle overhead
+        boolean needsLifecycle = hasCustomPreQuery.contains(queryType) 
+                              || hasCustomPostQuery.contains(queryType);
         
-        // Create context for lifecycle
+        if (!needsLifecycle) {
+            return handler.handle(query);
+        }
+
+        // Lifecycle path
         QueryContext ctx = new QueryContext();
         
-        // === LIFECYCLE: preQuery (cache lookup) ===
-        R cachedResult = handler.preQuery(query, ctx);
-        if (cachedResult != null) {
-            log.debug("Query returned from preQuery (cache hit)");
-            ctx.setCacheHit(cachedResult);
-            return cachedResult;
+        if (hasCustomPreQuery.contains(queryType)) {
+            R cached = handler.preQuery(query, ctx);
+            if (cached != null) {
+                return cached;
+            }
         }
         
-        // === LIFECYCLE: handle ===
         R result = handler.handle(query);
         
-        // === LIFECYCLE: postQuery (cache update) ===
-        handler.postQuery(query, result, ctx);
+        if (hasCustomPostQuery.contains(queryType)) {
+            handler.postQuery(query, result, ctx);
+        }
         
         return result;
+    }
+
+    private boolean hasOverriddenMethod(Class<?> clazz, String methodName) {
+        try {
+            for (Method method : clazz.getDeclaredMethods()) {
+                if (method.getName().equals(methodName)) {
+                    return true;
+                }
+            }
+            return false;
+        } catch (Exception e) {
+            return false;
+        }
     }
 }

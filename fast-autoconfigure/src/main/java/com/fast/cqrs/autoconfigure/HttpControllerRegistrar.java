@@ -75,6 +75,16 @@ public class HttpControllerRegistrar implements ImportBeanDefinitionRegistrar {
             );
 
             String beanName = generateBeanName(controllerInterface);
+
+            // Check for APT-generated implementation first
+            String generatedClassName = className + "_FastImpl";
+            try {
+                Class<?> generatedClass = ClassUtils.forName(generatedClassName, getClass().getClassLoader());
+                log.info("Found APT-generated controller: {}. Skipping proxy registration.", generatedClass.getSimpleName());
+                return;
+            } catch (ClassNotFoundException e) {
+                // Continue to create proxy
+            }
             int duplicateCount = 0;
             String originalBeanName = beanName;
             while (registry.containsBeanDefinition(beanName)) {
