@@ -20,11 +20,11 @@ import java.lang.annotation.Target;
  * OrderDto getOrder(@PathVariable String id);
  * }</pre>
  * 
- * Example with query class:
+ * Example with performance options:
  * <pre>{@code
- * @Query(query = GetOrderQuery.class)
+ * @Query(cache = "5m", metrics = "orders.get")
  * @GetMapping("/{id}")
- * OrderDto getOrder(@PathVariable String id);
+ * OrderDto getOrder(@PathVariable String id, @ModelAttribute GetOrderQuery query);
  * }</pre>
  *
  * @see Command
@@ -51,6 +51,49 @@ public @interface Query {
      * If specified, framework creates this query object and dispatches to QueryBus.
      */
     Class<?> query() default Void.class;
+
+    // ==================== Performance Options ====================
+
+    /**
+     * Cache TTL for query results.
+     * <p>
+     * Format: number + unit (s/m/h/d)
+     * Examples: "30s", "5m", "1h", "1d"
+     * <p>
+     * Empty string (default) = no caching.
+     */
+    String cache() default "";
+
+    /**
+     * Cache key expression using SpEL.
+     * <p>
+     * If empty, auto-generates key from method name and parameters.
+     * Examples:
+     * <ul>
+     *   <li>{@code "#query.id"} - Use the id property of the query parameter</li>
+     *   <li>{@code "#p0"} - Use the first parameter</li>
+     *   <li>{@code "'static-key'"} - Use a static key</li>
+     * </ul>
+     */
+    String cacheKey() default "";
+
+    /**
+     * Metrics name for this query.
+     * <p>
+     * If empty, no metrics are collected.
+     * If set, collects execution count, time, and error rate.
+     */
+    String metrics() default "";
+
+    /**
+     * Execution timeout.
+     * <p>
+     * Format: number + unit (ms/s/m)
+     * Examples: "500ms", "5s", "1m"
+     * <p>
+     * Empty string (default) = no timeout.
+     */
+    String timeout() default "";
 
     /**
      * Default placeholder handler.

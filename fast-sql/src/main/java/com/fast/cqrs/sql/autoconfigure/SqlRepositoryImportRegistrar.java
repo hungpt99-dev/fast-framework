@@ -71,6 +71,23 @@ public class SqlRepositoryImportRegistrar implements ImportBeanDefinitionRegistr
             Class<?> repositoryInterface = ClassUtils.forName(className, getClass().getClassLoader());
             String beanName = generateBeanName(repositoryInterface);
 
+            // Check for APT-generated implementation first (zero-overhead)
+            String generatedClassName = className + "_FastImpl";
+            try {
+                Class<?> generatedClass = ClassUtils.forName(generatedClassName, getClass().getClassLoader());
+                
+                GenericBeanDefinition beanDefinition = new GenericBeanDefinition();
+                beanDefinition.setBeanClass(generatedClass);
+                beanDefinition.setAutowireMode(GenericBeanDefinition.AUTOWIRE_CONSTRUCTOR);
+                
+                registry.registerBeanDefinition(beanName, beanDefinition);
+                log.info("Registered APT-generated repository: {} -> {}", beanName, generatedClass.getSimpleName());
+                return;
+            } catch (ClassNotFoundException e) {
+                log.debug("No APT-generated implementation found for {}, using runtime proxy", repositoryInterface.getSimpleName());
+            }
+
+            // Fallback to runtime proxy
             GenericBeanDefinition beanDefinition = new GenericBeanDefinition();
             beanDefinition.setBeanClass(SqlRepositoryProxyFactoryBean.class);
             beanDefinition.getConstructorArgumentValues().addGenericArgumentValue(repositoryInterface);

@@ -24,11 +24,8 @@ import java.lang.annotation.Target;
  * @Execute("INSERT INTO users(id, name, email) VALUES (:id, :name, :email)")
  * void insert(@Param("id") String id, @Param("name") String name, @Param("email") String email);
  *
- * @Execute("UPDATE users SET status = :status WHERE id = :id")
+ * @Execute(value = "UPDATE users SET status = :status WHERE id = :id", retry = 2)
  * int updateStatus(@Param("id") String id, @Param("status") String status);
- *
- * @Execute("DELETE FROM users WHERE id = :id")
- * void delete(@Param("id") String id);
  * }</pre>
  *
  * @see Select
@@ -47,4 +44,56 @@ public @interface Execute {
      * @return the SQL statement
      */
     String value();
+
+    // ==================== Performance Options ====================
+
+    /**
+     * Execution timeout.
+     * <p>
+     * Format: number + unit (ms/s/m)
+     * Examples: "500ms", "5s", "1m"
+     * <p>
+     * Empty string (default) = no timeout.
+     */
+    String timeout() default "";
+
+    /**
+     * Number of retry attempts for transient failures.
+     * <p>
+     * 0 (default) = no retry.
+     * Retries on deadlock, connection timeout, etc.
+     */
+    int retry() default 0;
+
+    /**
+     * Backoff delay between retry attempts.
+     * <p>
+     * Format: number + unit (ms/s)
+     * Examples: "100ms", "1s"
+     * <p>
+     * Default: "100ms"
+     */
+    String retryBackoff() default "100ms";
+
+    /**
+     * Enable metrics collection for this statement.
+     * <p>
+     * If true, collects execution count, time, and error rate.
+     */
+    boolean metrics() default false;
+
+    /**
+     * Metrics name override.
+     * <p>
+     * If empty, auto-generates from repository and method name.
+     */
+    String metricsName() default "";
+
+    /**
+     * Batch size for batch operations.
+     * <p>
+     * 0 (default) = execute as single statement.
+     * Set to a positive value for batch insert/update.
+     */
+    int batchSize() default 0;
 }

@@ -19,6 +19,13 @@ import java.lang.annotation.Target;
  * @PostMapping
  * void createOrder(@RequestBody CreateOrderCmd cmd);
  * }</pre>
+ * 
+ * Example with performance options:
+ * <pre>{@code
+ * @Command(retry = 3, metrics = "orders.create")
+ * @PostMapping
+ * void createOrder(@Valid @RequestBody CreateOrderCmd cmd);
+ * }</pre>
  *
  * @see Query
  * @see com.fast.cqrs.bus.CommandBus
@@ -42,6 +49,68 @@ public @interface Command {
      * The command class to instantiate from method parameters.
      */
     Class<?> command() default Void.class;
+
+    // ==================== Performance Options ====================
+
+    /**
+     * Metrics name for this command.
+     * <p>
+     * If empty, no metrics are collected.
+     * If set, collects execution count, time, and error rate.
+     */
+    String metrics() default "";
+
+    /**
+     * Number of retry attempts for transient failures.
+     * <p>
+     * 0 (default) = no retry.
+     * Retries on exceptions that are marked as retryable.
+     */
+    int retry() default 0;
+
+    /**
+     * Backoff delay between retry attempts.
+     * <p>
+     * Format: number + unit (ms/s)
+     * Examples: "100ms", "1s"
+     * <p>
+     * Default: "100ms"
+     */
+    String retryBackoff() default "100ms";
+
+    /**
+     * Execution timeout.
+     * <p>
+     * Format: number + unit (ms/s/m)
+     * Examples: "500ms", "5s", "1m"
+     * <p>
+     * Empty string (default) = no timeout.
+     */
+    String timeout() default "";
+
+    /**
+     * Idempotency key expression using SpEL.
+     * <p>
+     * If set, ensures the command is executed only once for the same key.
+     * Duplicate requests return the cached result.
+     * <p>
+     * Examples:
+     * <ul>
+     *   <li>{@code "#cmd.requestId"} - Use requestId from command</li>
+     *   <li>{@code "#headers['X-Request-Id']"} - Use request header</li>
+     * </ul>
+     * <p>
+     * Empty string (default) = not idempotent.
+     */
+    String idempotencyKey() default "";
+
+    /**
+     * Execute command asynchronously.
+     * <p>
+     * If true, the method returns immediately and command executes in background.
+     * Return type should be {@code void} or {@code CompletableFuture}.
+     */
+    boolean async() default false;
 
     /**
      * Default placeholder handler.

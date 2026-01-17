@@ -9,10 +9,10 @@ import com.fast.cqrs.sql.repository.FastRepository;
 import java.util.List;
 
 /**
- * SQL Repository for Order operations.
+ * SQL Repository for Order operations with performance features.
  * 
  * Extends FastRepository for automatic CRUD operations.
- * No implementation needed - the framework creates a dynamic proxy at runtime.
+ * Uses @Select with cache and metrics options.
  */
 @SqlRepository
 public interface OrderRepository extends FastRepository<Order, String> {
@@ -29,14 +29,28 @@ public interface OrderRepository extends FastRepository<Order, String> {
     // - count()
     // - deleteAll()
 
-    // Custom queries:
-    @Select("SELECT * FROM orders WHERE customer_id = :customerId")
+    /**
+     * Find orders by customer with 1 minute cache.
+     */
+    @Select(value = "SELECT * FROM orders WHERE customer_id = :customerId",
+            cache = "1m")
     List<Order> findByCustomerId(@Param("customerId") String customerId);
 
-    @Select("SELECT * FROM orders WHERE status = :status")
+    /**
+     * Find orders by status with metrics enabled.
+     */
+    @Select(value = "SELECT * FROM orders WHERE status = :status",
+            metrics = true)
     List<Order> findByStatus(@Param("status") String status);
 
-    @Select("SELECT * FROM orders WHERE customer_id = :customerId AND status = :status")
+    /**
+     * Complex query with cache, timeout, and metrics.
+     */
+    @Select(value = "SELECT * FROM orders WHERE customer_id = :customerId AND status = :status",
+            cache = "30s",
+            timeout = "5s",
+            metrics = true,
+            metricsName = "orders.findByCustomerAndStatus")
     List<Order> findByCustomerIdAndStatus(
             @Param("customerId") String customerId,
             @Param("status") String status);

@@ -8,6 +8,7 @@ include 'fast-util'
 include 'fast-concurrent'
 include 'fast-starter'
 include 'fast-dx'
+include 'fast-processor'
 
 
 

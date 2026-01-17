@@ -19,4 +19,7 @@ public record GetOrderQuery(
         if (includeCustomer == null)
             includeCustomer = false;
     }
+    public GetOrderQuery(String id) {
+        this(id, false, false);
+    }
 }

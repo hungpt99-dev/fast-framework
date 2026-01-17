@@ -5,32 +5,40 @@ import com.example.order.dto.OrderDto;
 import com.example.order.entity.Order;
 import com.example.order.repository.OrderRepository;
 import com.fast.cqrs.cqrs.QueryHandler;
+import com.fast.cqrs.cqrs.context.QueryContext;
 import com.fast.cqrs.logging.annotation.TraceLog;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 
 /**
  * Handler for GetOrdersByCustomerQuery.
- * <p>
- * Registered automatically with QueryBus.
- * Controller uses @Query without handler - framework auto-dispatches by query
- * type.
  */
 @Component
 public class GetOrdersByCustomerHandler implements QueryHandler<GetOrdersByCustomerQuery, List<OrderDto>> {
 
+    private static final Logger log = LoggerFactory.getLogger(GetOrdersByCustomerHandler.class);
     private final OrderRepository orderRepository;
 
     public GetOrdersByCustomerHandler(OrderRepository orderRepository) {
         this.orderRepository = orderRepository;
     }
 
+    @Override
+    public List<OrderDto> preQuery(GetOrdersByCustomerQuery query, QueryContext ctx) {
+        // Validate input
+        if (query.customerId() == null || query.customerId().isBlank()) {
+            throw new IllegalArgumentException("Customer ID is required");
+        }
+        return null;
+    }
+
     @TraceLog(slowMs = 200)
     @Override
     public List<OrderDto> handle(GetOrdersByCustomerQuery query) {
-        // Use pagination parameters from query
         List<Order> orders;
 
         if (query.status() != null) {
@@ -41,11 +49,13 @@ public class GetOrdersByCustomerHandler implements QueryHandler<GetOrdersByCusto
             orders = orderRepository.findByCustomerId(query.customerId());
         }
 
-        // TODO: Apply pagination (page, size) and sorting (sort)
-        // For now, just return all matching orders
-
         return orders.stream()
                 .map(OrderDto::fromEntity)
                 .toList();
+    }
+    
+    @Override
+    public void postQuery(GetOrdersByCustomerQuery query, List<OrderDto> result, QueryContext ctx) {
+        log.info("Found {} orders for customer {}", result.size(), query.customerId());
     }
 }

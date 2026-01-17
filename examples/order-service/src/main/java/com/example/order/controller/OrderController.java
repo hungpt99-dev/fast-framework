@@ -2,62 +2,47 @@ package com.example.order.controller;
 
 import com.example.order.dto.CreateOrderCmd;
 import com.example.order.dto.GetOrderQuery;
-import com.example.order.dto.GetOrdersByCustomerQuery;
 import com.example.order.dto.OrderDto;
-import com.fast.cqrs.cqrs.annotation.CacheableQuery;
 import com.fast.cqrs.cqrs.annotation.Command;
 import com.fast.cqrs.cqrs.annotation.HttpController;
-import com.fast.cqrs.cqrs.annotation.Metrics;
 import com.fast.cqrs.cqrs.annotation.Query;
-import com.fast.cqrs.cqrs.annotation.RetryCommand;
-
+import com.fast.cqrs.cqrs.gateway.CommandGateway;
+import com.fast.cqrs.cqrs.gateway.QueryGateway;
 import org.springframework.web.bind.annotation.*;
 
-import jakarta.validation.Valid;
-
-import java.util.List;
+import java.time.Duration;
 
 /**
- * Order API Controller demonstrating CQRS features.
- * <p>
- * REST conventions:
- * - @Query + @GetMapping for reads (handler is optional)
- * - @Command + @PostMapping for writes
- * <p>
- * Query endpoints use @ModelAttribute to bind query parameters.
- * The framework auto-detects @ModelAttribute and dispatches to QueryBus.
+ * REST Controller for Orders.
  */
-@HttpController
-@RequestMapping("/api/orders")
-public interface OrderController {
+@RestController
+@RequestMapping("/orders")
+public class OrderController {
 
-    /**
-     * Get order by ID.
-     * <p>
-     * Handler is optional - QueryBus finds handler by query type (GetOrderQuery).
-     */
-    @CacheableQuery(ttl = "5m")
-    @Metrics(name = "orders.get")
-    @Query
-    @GetMapping("/{id}")
-    OrderDto getOrder(@PathVariable String id, @ModelAttribute GetOrderQuery query);
+    private final CommandGateway commandGateway;
+    private final QueryGateway queryGateway;
 
-    /**
-     * Get orders by customer with pagination.
-     * <p>
-     * Uses @ModelAttribute to bind query parameters from URL.
-     */
-    @CacheableQuery(ttl = "1m")
-    @Query
-    @GetMapping
-    List<OrderDto> getOrdersByCustomer(@ModelAttribute GetOrdersByCustomerQuery query);
+    public OrderController(CommandGateway commandGateway, QueryGateway queryGateway) {
+        this.commandGateway = commandGateway;
+        this.queryGateway = queryGateway;
+    }
 
-    /**
-     * Create a new order.
-     */
-    @RetryCommand(maxAttempts = 3, backoff = "100ms")
-    @Metrics(name = "orders.create")
-    @Command
     @PostMapping
-    void createOrder(@Valid @RequestBody CreateOrderCmd cmd);
+    @Command
+    public void createOrder(@RequestBody CreateOrderCmd cmd) {
+        // Use fluent API for robust command dispatch
+        commandGateway.with(cmd)
+                .timeout(Duration.ofSeconds(5))
+                .retry(3)
+                .send();
+    }
+
+    @GetMapping("/{id}")
+    @Query(cache = "10s")  // Annotation-based cache control
+    public OrderDto getOrder(@PathVariable String id) {
+        // Use fluent API for query dispatch
+        return queryGateway.with(new GetOrderQuery(id))
+                .timeout(Duration.ofSeconds(2))
+                .execute();
+    }
 }

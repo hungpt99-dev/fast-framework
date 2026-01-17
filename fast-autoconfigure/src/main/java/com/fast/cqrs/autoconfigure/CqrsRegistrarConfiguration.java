@@ -74,4 +74,22 @@ public class CqrsRegistrarConfiguration {
     public ControllerProxyFactory controllerProxyFactory(CqrsDispatcher dispatcher) {
         return new ControllerProxyFactory(dispatcher);
     }
+
+    /**
+     * Creates the CommandGateway bean.
+     */
+    @Bean
+    @ConditionalOnMissingBean(com.fast.cqrs.cqrs.gateway.CommandGateway.class)
+    public com.fast.cqrs.cqrs.gateway.CommandGateway commandGateway(CommandBus commandBus) {
+        return new com.fast.cqrs.cqrs.gateway.DefaultCommandGateway(commandBus);
+    }
+
+    /**
+     * Creates the QueryGateway bean.
+     */
+    @Bean
+    @ConditionalOnMissingBean(com.fast.cqrs.cqrs.gateway.QueryGateway.class)
+    public com.fast.cqrs.cqrs.gateway.QueryGateway queryGateway(QueryBus queryBus) {
+        return new com.fast.cqrs.cqrs.gateway.DefaultQueryGateway(queryBus);
+    }
 }

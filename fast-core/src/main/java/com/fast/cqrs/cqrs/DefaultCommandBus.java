@@ -1,6 +1,6 @@
 package com.fast.cqrs.cqrs;
 
-import com.fast.cqrs.cqrs.CommandHandler;
+import com.fast.cqrs.cqrs.context.CommandContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -9,10 +9,15 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Default implementation of {@link CommandBus}.
+ * Default implementation of {@link CommandBus} with handler lifecycle support.
  * <p>
- * This implementation discovers all {@link CommandHandler} beans and
- * routes commands to the appropriate handler based on command type.
+ * This implementation:
+ * <ul>
+ *   <li>Discovers all {@link CommandHandler} beans</li>
+ *   <li>Routes commands to the appropriate handler</li>
+ *   <li>Invokes lifecycle methods: preHandle → handle → postHandle</li>
+ *   <li>Calls onError on exception</li>
+ * </ul>
  */
 public class DefaultCommandBus implements CommandBus {
 
@@ -56,6 +61,28 @@ public class DefaultCommandBus implements CommandBus {
         log.debug("Dispatching command: {} to handler: {}", 
                   commandType.getSimpleName(), handler.getClass().getSimpleName());
         
-        handler.handle(command);
+        // Create context for lifecycle
+        CommandContext ctx = new CommandContext();
+        
+        try {
+            // === LIFECYCLE: preHandle ===
+            boolean proceed = handler.preHandle(command, ctx);
+            
+            if (!proceed || ctx.shouldSkipHandler()) {
+                log.debug("Handler execution skipped by preHandle");
+                return;
+            }
+            
+            // === LIFECYCLE: handle ===
+            handler.handle(command);
+            
+            // === LIFECYCLE: postHandle ===
+            handler.postHandle(command, ctx);
+            
+        } catch (Throwable error) {
+            // === LIFECYCLE: onError ===
+            log.debug("Command execution error, invoking onError lifecycle", error);
+            handler.onError(command, error, ctx);
+        }
     }
 }

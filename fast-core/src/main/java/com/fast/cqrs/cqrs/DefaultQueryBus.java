@@ -1,6 +1,6 @@
 package com.fast.cqrs.cqrs;
 
-import com.fast.cqrs.cqrs.QueryHandler;
+import com.fast.cqrs.cqrs.context.QueryContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -9,10 +9,14 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Default implementation of {@link QueryBus}.
+ * Default implementation of {@link QueryBus} with handler lifecycle support.
  * <p>
- * This implementation discovers all {@link QueryHandler} beans and
- * routes queries to the appropriate handler based on query type.
+ * This implementation:
+ * <ul>
+ *   <li>Discovers all {@link QueryHandler} beans</li>
+ *   <li>Routes queries to the appropriate handler</li>
+ *   <li>Invokes lifecycle methods: preQuery → handle → postQuery</li>
+ * </ul>
  */
 public class DefaultQueryBus implements QueryBus {
 
@@ -56,6 +60,23 @@ public class DefaultQueryBus implements QueryBus {
         log.debug("Dispatching query: {} to handler: {}", 
                   queryType.getSimpleName(), handler.getClass().getSimpleName());
         
-        return handler.handle(query);
+        // Create context for lifecycle
+        QueryContext ctx = new QueryContext();
+        
+        // === LIFECYCLE: preQuery (cache lookup) ===
+        R cachedResult = handler.preQuery(query, ctx);
+        if (cachedResult != null) {
+            log.debug("Query returned from preQuery (cache hit)");
+            ctx.setCacheHit(cachedResult);
+            return cachedResult;
+        }
+        
+        // === LIFECYCLE: handle ===
+        R result = handler.handle(query);
+        
+        // === LIFECYCLE: postQuery (cache update) ===
+        handler.postQuery(query, result, ctx);
+        
+        return result;
     }
 }

@@ -1,0 +1,30 @@
+plugins {
+    id 'java-library'
+}
+
+description = 'Fast CQRS Annotation Processor - Compile-time code generation for zero-overhead runtime'
+
+dependencies {
+    // Annotation processing API
+    implementation 'com.google.auto.service:auto-service-annotations:1.1.1'
+    annotationProcessor 'com.google.auto.service:auto-service:1.1.1'
+    
+    // JavaPoet for code generation
+    implementation 'com.squareup:javapoet:1.13.0'
+    
+    // Access to the annotations we process
+    implementation project(':fast-sql')
+    implementation project(':fast-core')
+    
+    // Logging
+    implementation 'org.slf4j:slf4j-api'
+    
+    // Testing
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'com.google.testing.compile:compile-testing:0.21.0'
+}
+
+// Ensure annotation processor runs during compilation
+tasks.withType(JavaCompile).configureEach {
+    options.compilerArgs += ['-Xlint:processing']
+}
