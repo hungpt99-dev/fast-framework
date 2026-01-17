@@ -218,6 +218,20 @@ public class Application {
 
 ---
 
+## Performance
+
+Verified benchmarks on local hardware (MacBook M3, H2 Database):
+
+| Scenario | Throughput | Description |
+|:---|:---|:---|
+| **Raw Framework** | **~9,650 ops/sec** | Fast-path dispatch with full persistence. |
+| **Gateway** | **~6,750 ops/sec** | Full lifecycle (Validation, Logging) with fluent API. |
+| **Async** | **~3,740 ops/sec** | Virtual Threads (limited by DB Connection Pool contention). |
+
+*Benchmarks run with Console Logging enabled and H2 File Persistence.*
+
+---
+
 ## Technical Guide
 
 ### CQRS Controllers
@@ -279,7 +293,9 @@ User user = Tasks.supply("load-user", () -> userService.load(id))
 |--------|---------|
 | `fast-starter` | All-in-one dependency (Recommended) |
 | `fast-core` | Core CQRS patterns (Command/Query buses) |
-| `fast-sql` | explicit SQL repositories |
+| `fast-sql` | Explicit SQL repositories |
+| `fast-processor` | APT Processor for generating implementations |
+| `fast-autoconfigure` | Spring Boot Auto-configuration |
 | `fast-dx` | Developer Experience (CLI, convention enforcement) |
 | `fast-logging` | Observability (Logging, tracing) |
 | `fast-concurrent`| Virtual Thread structured concurrency |
@@ -289,9 +305,9 @@ User user = Tasks.supply("load-user", () -> userService.load(id))
 
 ## Requirements
 
-- Java 25+
-- Spring Boot 4.0+
-- Gradle 9.x
+- Java 21+
+- Spring Boot 3.4+
+- Gradle 8.x/9.x
 
 ---
 

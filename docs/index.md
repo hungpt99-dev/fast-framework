@@ -28,7 +28,7 @@ Welcome to the Fast Framework documentation.
 | Feature | Documentation |
 |---------|---------------|
 | Developer Experience | [DX.md](DX.md) |
-| Caching, Retry, Metrics | [FEATURES.md](FEATURES.md) |
+
 | Security & Authorization | [SECURITY.md](SECURITY.md) |
 
 ## Examples

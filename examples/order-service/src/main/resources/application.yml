@@ -13,14 +13,14 @@ spring:
     username: sa
     password:
     hikari:
-      maximum-pool-size: 20
-      minimum-idle: 5
+      maximum-pool-size: 40
+      minimum-idle: 10
       connection-timeout: 5000
       idle-timeout: 300000
   
   h2:
     console:
-      enabled: true
+      enabled: false
       path: /h2-console
 
   sql:
@@ -30,7 +30,10 @@ spring:
 
 logging:
   level:
-    FRAMEWORK_HTTP: INFO
-    FRAMEWORK_TRACE: DEBUG
-    FRAMEWORK_BIZ: INFO
+    root: WARN
+    com.example.order: WARN
+    com.example.order.handler.BenchmarkHandler: INFO
+    FRAMEWORK_HTTP: WARN
+    FRAMEWORK_TRACE: WARN
+    FRAMEWORK_BIZ: WARN
     FRAMEWORK_EXCEPTION: ERROR

@@ -36,9 +36,10 @@ This separation makes code easier to test, optimize, and reason about.
 ## How It Works
 
 1. **Define interface** - Controller is just an interface with annotations
-2. **Framework creates proxy** - Dynamic proxy implements the interface
-3. **Dispatcher routes** - Based on @Query or @Command annotation
-4. **Handler executes** - Business logic in a testable handler class
+2. **APT generates code** - `fast-processor` generates a concrete implementation class at compile time (Fast Path)
+3. **Fallback to Proxy** - If APT is disabled, a dynamic proxy is created at runtime (Slow Path)
+4. **Dispatcher routes** - Based on @Query or @Command annotation
+5. **Handler executes** - Business logic in a testable handler class
 
 ```
 @Query → QueryBus → QueryHandler → returns data
@@ -148,3 +149,64 @@ public class CreateUserHandler implements CommandHandler<CreateUserCmd> {
 | No business logic in controllers | Controllers are just routing definitions |
 | Handlers are Spring beans | Enables dependency injection and AOP |
 | Commands return void | State changes should not return data |
+
+---
+
+## Handler Lifecycle
+
+Handlers can participate in the execution lifecycle by implementing optional methods.
+
+```java
+@Component
+public class CreateOrderHandler implements CommandHandler<CreateOrderCmd> {
+
+    @Override
+    public boolean preHandle(CreateOrderCmd cmd, CommandContext ctx) {
+        if (cmd.amount() < 0) throw new IllegalArgumentException("Invalid amount");
+        return true; // Return false to abort execution
+    }
+
+    @Override
+    public void handle(CreateOrderCmd cmd) {
+        // Core business logic
+    }
+
+    @Override
+    public void postHandle(CreateOrderCmd cmd, CommandContext ctx) {
+        // Audit logging, event publishing
+    }
+
+    @Override
+    public void onError(CreateOrderCmd cmd, Throwable t, CommandContext ctx) {
+        // Error recovery
+    }
+}
+```
+
+---
+
+## Command & Query Gateways
+
+Fluent APIs provide advanced dispatching options.
+
+### Command Dispatch
+```java
+gateway.with(new CreateOrderCmd(123))
+       .timeout(Duration.ofSeconds(5))
+       .retry(3)
+       .send();
+```
+
+### Query Dispatch
+```java
+// Async
+CompletableFuture<OrderDto> future = queryGateway.with(new GetQuery("1"))
+                                                .queryAsync();
+
+// Parallel Scatter-Gather
+List<OrderDto> results = queryGateway.parallel()
+                                    .add(new GetQuery("A"))
+                                    .add(new GetQuery("B"))
+                                    .executeAll();
+```
+
