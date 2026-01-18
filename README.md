@@ -313,10 +313,21 @@ User user = Tasks.supply("load-user", () -> userService.load(id))
 
 ## Documentation Links
 
-- [CQRS.md](docs/CQRS.md) - Controllers and handlers
-- [SQL.md](docs/SQL.md) - SQL repositories
-- [REPOSITORY.md](docs/REPOSITORY.md) - FastRepository
-- [EXAMPLE.md](docs/EXAMPLE.md) - Complete example
+- [Documentation Index](docs/index.md) - **Start Here**
+- [Architecture](docs/architecture.md) - System overview
+- [Configuration](docs/configuration.md) - Configuration properties
+- [Troubleshooting](docs/troubleshooting.md) - Common issues and fixes
+- [CQRS](docs/CQRS.md) - Controllers and handlers
+- [SQL](docs/SQL.md) - SQL repositories
+- [Repository](docs/REPOSITORY.md) - FastRepository usage
+- [Concurrent](docs/CONCURRENT.md) - Concurrency utilities
+- [Security](docs/SECURITY.md) - Security features
+- [Logging](docs/LOGGING.md) - Logging and tracing
+- [DX](docs/DX.md) - Developer Experience tools
+- [Util](docs/UTIL.md) - Common utilities
+- [Example](docs/EXAMPLE.md) - Complete example project
+- [Contributing](docs/contributing.md) - How to contribute
+- [Changelog](docs/changelog.md) - Release notes
 
 ---
 
