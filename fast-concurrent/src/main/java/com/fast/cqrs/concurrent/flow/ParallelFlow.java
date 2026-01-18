@@ -168,6 +168,9 @@ public class ParallelFlow {
 
                     fireEvent(TaskEvent.completed(name, System.nanoTime() - taskStart));
                 } catch (Exception e) {
+                    if (e instanceof InterruptedException || e.getCause() instanceof InterruptedException) {
+                        Thread.currentThread().interrupt();
+                    }
                     errors.put(name, e);
                     fireEvent(TaskEvent.failed(name, e, 0));
 

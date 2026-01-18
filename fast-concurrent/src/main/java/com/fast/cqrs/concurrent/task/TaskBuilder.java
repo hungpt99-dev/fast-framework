@@ -4,6 +4,8 @@ import com.fast.cqrs.concurrent.context.ContextSnapshot;
 import com.fast.cqrs.concurrent.event.TaskEvent;
 import com.fast.cqrs.concurrent.event.TaskEventListener;
 import com.fast.cqrs.concurrent.executor.ExecutorRegistry;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -207,6 +209,8 @@ public class TaskBuilder<T> {
  */
 class DefaultTask<T> implements Task<T> {
 
+    private static final Logger log = LoggerFactory.getLogger(DefaultTask.class);
+
     // Cached direct executor - reused across all tasks
     private static final ExecutorService DIRECT_EXECUTOR = MoreExecutors.directExecutor();
 
@@ -259,7 +263,7 @@ class DefaultTask<T> implements Task<T> {
 
             if (fallback != null) {
                 if (trace) {
-                    System.out.println("[TASK] " + name + " using fallback due to: " + e.getMessage());
+                    log.warn("[TASK] {} using fallback due to: {}", name, e.getMessage());
                 }
                 return fallback.get();
             }
@@ -297,6 +301,16 @@ class DefaultTask<T> implements Task<T> {
                     return supplier.get();
                 }
             } catch (Exception e) {
+                // If interrupted, stop retrying and propagate immediately
+                if (e instanceof InterruptedException || e.getCause() instanceof InterruptedException) {
+                    Thread.currentThread().interrupt();
+                    throw wrapException(e);
+                }
+                // If explicitly cancelled/timed out, stop retrying
+                if (e instanceof CancellationException) {
+                    throw wrapException(e);
+                }
+
                 lastException = e;
 
                 if (attempt < maxRetries) {
@@ -307,8 +321,7 @@ class DefaultTask<T> implements Task<T> {
                             : retryDelay.toMillis();
 
                     if (trace) {
-                        System.out.println("[TASK] " + name + " retry " + (attempt + 1) + "/" + maxRetries + " after "
-                                + delay + "ms");
+                        log.info("[TASK] {} retry {}/{} after {}ms", name, attempt + 1, maxRetries, delay);
                     }
 
                     sleep(delay);
@@ -350,7 +363,7 @@ class DefaultTask<T> implements Task<T> {
 
     private void fireEvent(TaskEvent event) {
         if (trace) {
-            System.out.println("[TASK] " + event);
+            log.info("[TASK] {}", event);
         }
         for (TaskEventListener listener : listeners) {
             try {

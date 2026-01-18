@@ -3,8 +3,9 @@ package com.fast.cqrs.concurrent.metrics;
 import com.fast.cqrs.concurrent.event.TaskEvent;
 import com.fast.cqrs.concurrent.event.TaskEventListener;
 
-/**
- * Integration with Micrometer metrics (optional dependency).
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
  * <p>
  * Usage:
  * 
@@ -20,10 +21,12 @@ import com.fast.cqrs.concurrent.event.TaskEventListener;
  */
 public final class MicrometerMetrics {
 
-    private static Object meterRegistry;
+    private static MeterRegistry meterRegistry;
     private static boolean available = false;
 
     static {
+        // Since micrometer-core is implementation, we can just check availability or assume true if we want
+        // But to be safe against classpath exclusions, we check:
         try {
             Class.forName("io.micrometer.core.instrument.MeterRegistry");
             available = true;
@@ -38,12 +41,9 @@ public final class MicrometerMetrics {
     /**
      * Configures with a MeterRegistry.
      */
-    public static void configure(Object registry) {
-        if (!available) {
-            throw new IllegalStateException(
-                    "Micrometer not available. Add io.micrometer:micrometer-core dependency.");
-        }
+    public static void configure(MeterRegistry registry) {
         meterRegistry = registry;
+        available = true;
     }
 
     /**
@@ -58,8 +58,7 @@ public final class MicrometerMetrics {
      */
     public static TaskEventListener listener() {
         if (!isAvailable()) {
-            return event -> {
-            }; // No-op if not configured
+            return event -> {};
         }
 
         return event -> {
@@ -71,41 +70,40 @@ public final class MicrometerMetrics {
         };
     }
 
-    private static void recordMetric(TaskEvent event) throws Exception {
-        Class<?> meterClass = Class.forName("io.micrometer.core.instrument.MeterRegistry");
-        Class<?> timerClass = Class.forName("io.micrometer.core.instrument.Timer");
-        Class<?> counterClass = Class.forName("io.micrometer.core.instrument.Counter");
-
+    private static void recordMetric(TaskEvent event) {
         String taskName = event.taskName();
 
         switch (event) {
             case TaskEvent.Completed c -> {
-                // Record duration
-                Object timer = meterClass.getMethod("timer", String.class, String[].class)
-                        .invoke(meterRegistry, "task.duration", new String[] { "task", taskName });
-                timerClass.getMethod("record", java.time.Duration.class)
-                        .invoke(timer, java.time.Duration.ofNanos(c.durationNanos()));
+                Timer.builder("task.duration")
+                        .tag("task", taskName)
+                        .register(meterRegistry)
+                        .record(c.duration());
 
-                // Increment counter
-                Object counter = meterClass.getMethod("counter", String.class, String[].class)
-                        .invoke(meterRegistry, "task.completed", new String[] { "task", taskName });
-                counterClass.getMethod("increment").invoke(counter);
+                Counter.builder("task.completed")
+                        .tag("task", taskName)
+                        .register(meterRegistry)
+                        .increment();
             }
             case TaskEvent.Failed f -> {
-                Object counter = meterClass.getMethod("counter", String.class, String[].class)
-                        .invoke(meterRegistry, "task.failed", new String[] { "task", taskName });
-                counterClass.getMethod("increment").invoke(counter);
+                Counter.builder("task.failed")
+                        .tag("task", taskName)
+                        .tag("error", f.error().getClass().getSimpleName())
+                        .register(meterRegistry)
+                        .increment();
             }
             case TaskEvent.TimedOut t -> {
-                Object counter = meterClass.getMethod("counter", String.class, String[].class)
-                        .invoke(meterRegistry, "task.timeout", new String[] { "task", taskName });
-                counterClass.getMethod("increment").invoke(counter);
+                Counter.builder("task.timeout")
+                        .tag("task", taskName)
+                        .register(meterRegistry)
+                        .increment();
             }
             case TaskEvent.Retrying r -> {
-                Object counter = meterClass.getMethod("counter", String.class, String[].class)
-                        .invoke(meterRegistry, "task.retry",
-                                new String[] { "task", taskName, "attempt", String.valueOf(r.attempt()) });
-                counterClass.getMethod("increment").invoke(counter);
+                Counter.builder("task.retry")
+                        .tag("task", taskName)
+                        .tag("attempt", String.valueOf(r.attempt()))
+                        .register(meterRegistry)
+                        .increment();
             }
             default -> {
             }

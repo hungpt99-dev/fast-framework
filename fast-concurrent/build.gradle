@@ -11,13 +11,22 @@ dependencies {
     // Optional: Spring integration
     compileOnly 'org.springframework:spring-context'
     compileOnly 'org.springframework.security:spring-security-core'
+    compileOnly 'org.springframework.boot:spring-boot-autoconfigure'
+    compileOnly 'org.springframework.boot:spring-boot'
     
     // Optional: Metrics
-    compileOnly 'io.micrometer:micrometer-core'
+    implementation 'io.micrometer:micrometer-core'
     
     // Optional: Tracing
     compileOnly 'io.opentelemetry:opentelemetry-api:1.40.0'
     
+    // Caching for KeyedConcurrency
+    implementation 'com.github.ben-manes.caffeine:caffeine:3.1.8'
+
+    // AOP
+    implementation 'org.springframework:spring-aop'
+    implementation 'org.aspectj:aspectjweaver'
+
     // Testing
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
 }

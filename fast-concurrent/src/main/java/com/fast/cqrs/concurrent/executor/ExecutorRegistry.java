@@ -1,5 +1,7 @@
 package com.fast.cqrs.concurrent.executor;
 
+import com.fast.cqrs.concurrent.spring.FastConcurrentProperties;
+
 import java.util.Map;
 import java.util.concurrent.*;
 
@@ -32,14 +34,40 @@ public final class ExecutorRegistry {
     public static final String CPU = "cpu";
     public static final String IO = "io";
 
+    // Static defaults are now handled via configure() or lazy init if needed
+    // Leaving empty or removing completely.
     static {
-        // Register defaults
+        // Defaults if configure is never called (e.g. non-Spring usage)
         register(VIRTUAL, ExecutorType.VIRTUAL);
         register(CPU, ExecutorType.CPU);
         register(IO, ExecutorType.IO, 100);
     }
 
     private ExecutorRegistry() {
+    }
+
+    /**
+     * Configures default executors from properties.
+     */
+    public static void configure(FastConcurrentProperties properties) {
+        // Shutdown existing if any (re-configuration support)
+        shutdownAll();
+        executors.clear();
+
+        // Register Virtual
+        register(VIRTUAL, ExecutorType.VIRTUAL);
+
+        // Register CPU
+        register(CPU, ExecutorType.CPU, 
+                properties.getCpu().getCoreSize(), 
+                properties.getCpu().getMaxSize(),
+                properties.getCpu().getQueueCapacity());
+
+        // Register IO
+        register(IO, ExecutorType.IO, 
+                properties.getIo().getCoreSize(), 
+                properties.getIo().getMaxSize(),
+                properties.getIo().getQueueCapacity());
     }
 
     /**
@@ -53,7 +81,11 @@ public final class ExecutorRegistry {
      * Registers an executor with explicit size.
      */
     public static void register(String name, ExecutorType type, int maxThreads) {
-        ExecutorService executor = createExecutor(type, maxThreads);
+        register(name, type, maxThreads, maxThreads, 1000);
+    }
+
+    public static void register(String name, ExecutorType type, int coreThreads, int maxThreads, int queueCapacity) {
+        ExecutorService executor = createExecutor(type, coreThreads, maxThreads, queueCapacity);
         executors.put(name, new ManagedExecutor(name, type, executor, maxThreads));
     }
 
@@ -129,19 +161,39 @@ public final class ExecutorRegistry {
         }
     }
 
-    private static ExecutorService createExecutor(ExecutorType type, int maxThreads) {
+    /**
+     * Waits for all executors to terminate.
+     */
+    public static boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException {
+        long nanos = unit.toNanos(timeout);
+        long deadline = System.nanoTime() + nanos;
+
+        for (ManagedExecutor managed : executors.values()) {
+            long remaining = deadline - System.nanoTime();
+            if (remaining <= 0) {
+                return false;
+            }
+            // If already terminated, this returns immediately true
+            if (!managed.executor.awaitTermination(remaining, TimeUnit.NANOSECONDS)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static ExecutorService createExecutor(ExecutorType type, int core, int max, int queue) {
         return switch (type) {
             case VIRTUAL -> Executors.newVirtualThreadPerTaskExecutor();
             case CPU -> new ThreadPoolExecutor(
-                    Runtime.getRuntime().availableProcessors(),
-                    Runtime.getRuntime().availableProcessors(),
+                    core <= 0 ? Runtime.getRuntime().availableProcessors() : core,
+                    max <= 0 ? Runtime.getRuntime().availableProcessors() : max,
                     60L, TimeUnit.SECONDS,
-                    new LinkedBlockingQueue<>(1000),
+                    new LinkedBlockingQueue<>(queue),
                     new ThreadPoolExecutor.CallerRunsPolicy());
             case IO, BLOCKING -> new ThreadPoolExecutor(
-                    10, maxThreads,
+                    core, max,
                     60L, TimeUnit.SECONDS,
-                    new LinkedBlockingQueue<>(maxThreads * 2),
+                    new LinkedBlockingQueue<>(queue),
                     new ThreadPoolExecutor.CallerRunsPolicy());
             case CUSTOM -> throw new IllegalArgumentException("Use register(name, executor) for custom");
         };

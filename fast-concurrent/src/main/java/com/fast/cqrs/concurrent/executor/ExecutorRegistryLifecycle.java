@@ -59,9 +59,7 @@ public class ExecutorRegistryLifecycle implements DisposableBean {
     
     private boolean waitForTermination() {
         try {
-            // Simple check - just wait a bit for termination
-            Thread.sleep(500);
-            return true;
+            return ExecutorRegistry.awaitTermination(5, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return false;

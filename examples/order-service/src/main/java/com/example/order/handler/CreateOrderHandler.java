@@ -4,6 +4,7 @@ import com.example.order.dto.CreateOrderCmd;
 import com.example.order.entity.Order;
 import com.example.order.repository.OrderRepository;
 
+import com.fast.cqrs.concurrent.annotation.ConcurrentLimit;
 import com.fast.cqrs.cqrs.CommandHandler;
 import com.fast.cqrs.cqrs.context.CommandContext;
 import com.fast.cqrs.util.IdGenerator;
@@ -47,6 +48,7 @@ public class CreateOrderHandler implements CommandHandler<CreateOrderCmd> {
     }
 
     @Override
+    @ConcurrentLimit(permits = 5)
     public void handle(CreateOrderCmd cmd) {
         String orderId = cmd.orderId() != null ? cmd.orderId() : IdGenerator.prefixedId("ORD");
 

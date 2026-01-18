@@ -36,11 +36,11 @@ public class ValidationInterceptor {
         boolean available = false;
         Validator validator = null;
         try {
-            Class.forName("jakarta.validation.Validation");
+            // Safe linkage check - triggers NoClassDefFoundError if missing
             ValidatorFactory factory = Validation.buildDefaultValidatorFactory();
             validator = factory.getValidator();
             available = true;
-        } catch (Exception e) {
+        } catch (Throwable e) {
             // Bean Validation not available
         }
         VALIDATION_AVAILABLE = available;
@@ -70,42 +70,53 @@ public class ValidationInterceptor {
         if (!VALIDATION_AVAILABLE || args == null || args.length == 0) {
             return;
         }
-
-        Parameter[] parameters = method.getParameters();
-
-        for (int i = 0; i < parameters.length; i++) {
-            if (i >= args.length || args[i] == null) {
-                continue;
-            }
-
-            // Check if parameter has @Valid annotation
-            if (hasValidAnnotation(parameters[i])) {
-                validateObject(args[i], parameters[i].getName());
-            }
-        }
+        ValidationHelper.validate(method, args, VALIDATOR);
     }
 
-    private static boolean hasValidAnnotation(Parameter parameter) {
-        for (Annotation annotation : parameter.getAnnotations()) {
-            if (annotation.annotationType().getName().endsWith(".Valid")) {
-                return true;
+    /**
+     * Helper class to isolate Bean Validation annotation dependencies.
+     * Loaded only when Jakarta Validation is available.
+     */
+    private static class ValidationHelper {
+        static void validate(Method method, Object[] args, Validator validator) {
+            Parameter[] parameters = method.getParameters();
+
+            for (int i = 0; i < parameters.length; i++) {
+                if (i >= args.length || args[i] == null) {
+                    continue;
+                }
+
+                // Type-safe check for @Valid
+                if (parameters[i].isAnnotationPresent(Valid.class) || hasValidAnnotation(parameters[i])) {
+                    validateObject(args[i], parameters[i].getName(), validator);
+                }
             }
         }
-        return false;
-    }
 
-    private static void validateObject(Object obj, String paramName) {
-        Set<ConstraintViolation<Object>> violations = VALIDATOR.validate(obj);
-
-        if (!violations.isEmpty()) {
-            String message = violations.stream()
-                    .map(v -> v.getPropertyPath() + ": " + v.getMessage())
-                    .collect(Collectors.joining(", "));
-
-            log.warn("Validation failed for {}: {}", paramName, message);
-            throw new ValidationException("Validation failed: " + message, violations);
+        // Keep fallback for meta-annotations if needed, or simplified direct check
+        private static boolean hasValidAnnotation(Parameter parameter) {
+            for (Annotation annotation : parameter.getAnnotations()) {
+                if (annotation instanceof Valid) {
+                    return true;
+                }
+                // Check meta-annotations if necessary, or just rely on direct present
+            }
+            return false;
         }
 
-        log.debug("Validation passed for {}", paramName);
+        private static void validateObject(Object obj, String paramName, Validator validator) {
+            Set<ConstraintViolation<Object>> violations = validator.validate(obj);
+
+            if (!violations.isEmpty()) {
+                String message = violations.stream()
+                        .map(v -> v.getPropertyPath() + ": " + v.getMessage())
+                        .collect(Collectors.joining(", "));
+
+                log.warn("Validation failed for {}: {}", paramName, message);
+                throw new ValidationException("Validation failed: " + message, violations);
+            }
+
+            log.debug("Validation passed for {}", paramName);
+        }
     }
 }

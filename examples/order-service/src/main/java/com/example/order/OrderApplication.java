@@ -11,8 +11,11 @@ import org.springframework.context.annotation.Bean;
  * 
  * Uses @EnableFast for zero-config setup.
  */
+import com.fast.cqrs.concurrent.spring.EnableFastConcurrent;
+
 @SpringBootApplication
 @EnableFast
+@EnableFastConcurrent
 public class OrderApplication {
 
     public static void main(String[] args) {

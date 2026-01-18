@@ -1,5 +1,8 @@
 package com.fast.cqrs.concurrent.event;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * Listener for task lifecycle events.
  * <p>
@@ -34,22 +37,21 @@ public interface TaskEventListener {
      * Creates a listener that logs events.
      */
     static TaskEventListener logging() {
+        Logger log = LoggerFactory.getLogger(TaskEventListener.class);
         return event -> {
             switch (event) {
                 case TaskEvent.Started s ->
-                    System.out.println("[TASK] " + s.taskName() + " started");
+                    log.info("[TASK] {} started", s.taskName());
                 case TaskEvent.Completed c ->
-                    System.out.println("[TASK] " + c.taskName() + " completed in " +
-                            (c.durationNanos() / 1_000_000) + "ms");
+                    log.info("[TASK] {} completed in {}ms", c.taskName(), c.durationNanos() / 1_000_000);
                 case TaskEvent.Failed f ->
-                    System.err.println("[TASK] " + f.taskName() + " failed: " + f.error().getMessage());
+                    log.error("[TASK] {} failed: {}", f.taskName(), f.error().getMessage());
                 case TaskEvent.TimedOut t ->
-                    System.out.println("[TASK] " + t.taskName() + " timed out after " + t.timeout());
+                    log.warn("[TASK] {} timed out after {}", t.taskName(), t.timeout());
                 case TaskEvent.Retrying r ->
-                    System.out.println("[TASK] " + r.taskName() + " retrying " +
-                            r.attempt() + "/" + r.maxAttempts());
+                    log.info("[TASK] {} retrying {}/{}", r.taskName(), r.attempt(), r.maxAttempts());
                 case TaskEvent.Cancelled c ->
-                    System.out.println("[TASK] " + c.taskName() + " cancelled");
+                    log.info("[TASK] {} cancelled", c.taskName());
             }
         };
     }

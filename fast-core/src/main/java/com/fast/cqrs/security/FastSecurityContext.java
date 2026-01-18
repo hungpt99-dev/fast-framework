@@ -34,11 +34,10 @@ public final class FastSecurityContext {
     static {
         SecurityContext context;
         try {
-            // Check if Spring Security is available
-            Class.forName("org.springframework.security.core.context.SecurityContextHolder");
+            // Safe linkage check - triggers NoClassDefFoundError if missing
             context = new SpringSecurityContext();
             log.debug("Spring Security detected, using SpringSecurityContext");
-        } catch (ClassNotFoundException e) {
+        } catch (Throwable e) {
             context = new NoOpSecurityContext();
             log.debug("Spring Security not found, using NoOpSecurityContext");
         }

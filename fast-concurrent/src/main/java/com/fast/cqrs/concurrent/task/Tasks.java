@@ -1,5 +1,6 @@
 package com.fast.cqrs.concurrent.task;
 
+import java.util.concurrent.Callable;
 import java.util.function.Supplier;
 
 /**
@@ -60,7 +61,7 @@ public final class Tasks {
      * @param callable the callable function
      * @return task builder
      */
-    public static <T> TaskBuilder<T> call(String name, java.util.concurrent.Callable<T> callable) {
+    public static <T> TaskBuilder<T> call(String name, Callable<T> callable) {
         return new TaskBuilder<>(name, () -> {
             try {
                 return callable.call();

@@ -4,6 +4,7 @@ import com.example.order.dto.GetOrderQuery;
 import com.example.order.dto.OrderDto;
 import com.example.order.entity.Order;
 import com.example.order.repository.OrderRepository;
+import com.fast.cqrs.concurrent.annotation.KeyedConcurrency;
 import com.fast.cqrs.cqrs.QueryHandler;
 import com.fast.cqrs.cqrs.context.QueryContext;
 import org.slf4j.Logger;
@@ -41,6 +42,7 @@ public class GetOrderHandler implements QueryHandler<GetOrderQuery, OrderDto> {
     }
 
     @Override
+    @KeyedConcurrency(key = "#query.id")
     public OrderDto handle(GetOrderQuery query) {
         log.info("Fetching order from DB: {}", query.id());
         return orderRepository.findById(query.id())

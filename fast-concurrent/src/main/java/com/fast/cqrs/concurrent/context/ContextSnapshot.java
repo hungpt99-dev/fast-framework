@@ -2,6 +2,8 @@ package com.fast.cqrs.concurrent.context;
 
 import org.slf4j.MDC;
 
+import java.util.concurrent.Callable;
+
 import java.util.HashMap;
 import java.util.Map;
 
@@ -111,15 +113,30 @@ public class ContextSnapshot {
         };
     }
 
+    /**
+     * Returns a callable that wraps the given callable with context propagation.
+     */
+    public <T> Callable<T> wrap(Callable<T> callable) {
+        return () -> {
+            restore();
+            try {
+                return callable.call();
+            } finally {
+                clear();
+            }
+        };
+    }
+
     // Accessor strategy to avoid per-request reflection
     private static final SecurityContextAccessor SECURITY_ACCESSOR;
 
     static {
         SecurityContextAccessor accessor;
         try {
-            Class.forName("org.springframework.security.core.context.SecurityContextHolder");
+            // Try to instantiate - triggers NoClassDefFoundError if missing
             accessor = new SpringSecurityContextAccessor();
-        } catch (ClassNotFoundException e) {
+        } catch (Throwable e) {
+            // Fallback if Spring Security is not on classpath
             accessor = new NoOpSecurityContextAccessor();
         }
         SECURITY_ACCESSOR = accessor;

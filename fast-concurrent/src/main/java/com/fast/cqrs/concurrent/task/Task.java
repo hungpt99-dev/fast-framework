@@ -1,5 +1,6 @@
 package com.fast.cqrs.concurrent.task;
 
+import java.util.concurrent.Future;
 import java.util.function.Supplier;
 
 /**
@@ -32,7 +33,7 @@ public interface Task<T> {
     /**
      * Executes the task asynchronously.
      */
-    java.util.concurrent.Future<T> executeAsync();
+    Future<T> executeAsync();
 
     /**
      * Gets the task name.

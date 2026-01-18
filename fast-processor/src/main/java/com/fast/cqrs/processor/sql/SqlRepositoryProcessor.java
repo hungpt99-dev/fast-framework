@@ -117,6 +117,9 @@ public class SqlRepositoryProcessor extends AbstractProcessor {
                 .addAnnotation(AnnotationSpec.builder(ClassName.get("org.springframework.stereotype", "Repository"))
                         .addMember("value", "$S", Character.toLowerCase(interfaceName.charAt(0)) + interfaceName.substring(1))
                         .build())
+                .addAnnotation(AnnotationSpec.builder(SuppressWarnings.class)
+                        .addMember("value", "{$S, $S}", "unchecked", "rawtypes")
+                        .build())
                 .addJavadoc("Generated implementation for {@link $T}.\n", repositoryInterface)
                 .addJavadoc("<p>GraalVM compatible: All RowMappers are generated at compile-time.\n");
 

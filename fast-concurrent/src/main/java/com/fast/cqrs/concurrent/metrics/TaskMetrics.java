@@ -4,6 +4,7 @@ import com.fast.cqrs.concurrent.event.TaskEvent;
 import com.fast.cqrs.concurrent.event.TaskEventListener;
 
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.LongAdder;
@@ -116,7 +117,7 @@ public final class TaskMetrics {
     /**
      * Gets all task names with metrics.
      */
-    public static java.util.Set<String> taskNames() {
+    public static Set<String> taskNames() {
         return taskStats.keySet();
     }
 
