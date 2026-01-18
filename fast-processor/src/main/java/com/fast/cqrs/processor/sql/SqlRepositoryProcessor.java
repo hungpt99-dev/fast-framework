@@ -45,6 +45,7 @@ public class SqlRepositoryProcessor extends AbstractProcessor {
     private Types typeUtils;
     private Filer filer;
     private ProcessorLogger logger;
+    private boolean metricsAvailable;
 
     @Override
     public synchronized void init(ProcessingEnvironment processingEnv) {
@@ -53,6 +54,12 @@ public class SqlRepositoryProcessor extends AbstractProcessor {
         this.typeUtils = processingEnv.getTypeUtils();
         this.filer = processingEnv.getFiler();
         this.logger = new ProcessorLogger(processingEnv.getMessager());
+        
+        // Check if Micrometer is available
+        this.metricsAvailable = elementUtils.getTypeElement("io.micrometer.core.instrument.MeterRegistry") != null;
+        if (metricsAvailable) {
+            logger.note("Micrometer detected - metrics support enabled");
+        }
     }
 
     @Override
@@ -117,10 +124,7 @@ public class SqlRepositoryProcessor extends AbstractProcessor {
         ClassName jdbcTemplateClass = ClassName.get("org.springframework.jdbc.core.namedparam", "NamedParameterJdbcTemplate");
         classBuilder.addField(FieldSpec.builder(jdbcTemplateClass, "jdbcTemplate", Modifier.PRIVATE, Modifier.FINAL).build());
 
-        ClassName crudExecutorClass = ClassName.get("com.fast.cqrs.sql.repository", "CrudExecutor");
-        if (hasFastRepository) {
-            classBuilder.addField(FieldSpec.builder(crudExecutorClass, "crudExecutor", Modifier.PRIVATE, Modifier.FINAL).build());
-        }
+        // CrudExecutor removed - all CRUD methods are now generated inline for GraalVM compatibility
 
         // Add CacheManager if needed
         if (needsCaching) {
@@ -134,10 +138,7 @@ public class SqlRepositoryProcessor extends AbstractProcessor {
                 .addParameter(jdbcTemplateClass, "jdbcTemplate")
                 .addStatement("this.jdbcTemplate = jdbcTemplate");
 
-        if (hasFastRepository && entityType != null) {
-            ctorBuilder.addStatement("this.crudExecutor = new $T(jdbcTemplate, $T.class)", 
-                    crudExecutorClass, TypeName.get(entityType));
-        }
+        // No CrudExecutor initialization needed - all SQL is generated at compile time
 
         if (needsCaching) {
             ClassName cacheManagerClass = ClassName.get("org.springframework.cache", "CacheManager");
@@ -145,6 +146,18 @@ public class SqlRepositoryProcessor extends AbstractProcessor {
                     .addAnnotation(ClassName.get("org.springframework.lang", "Nullable"))
                     .build());
             ctorBuilder.addStatement("this.cacheManager = cacheManager");
+        }
+
+        // Add MeterRegistry if metrics supported and detected
+        boolean needsMetrics = needsMetrics(repositoryInterface);
+        if (needsMetrics && metricsAvailable) {
+            ClassName meterRegistryClass = ClassName.get("io.micrometer.core.instrument", "MeterRegistry");
+            classBuilder.addField(FieldSpec.builder(meterRegistryClass, "meterRegistry", Modifier.PRIVATE, Modifier.FINAL).build());
+            
+            ctorBuilder.addParameter(ParameterSpec.builder(meterRegistryClass, "meterRegistry")
+                    .addAnnotation(ClassName.get("org.springframework.lang", "Nullable"))
+                    .build());
+            ctorBuilder.addStatement("this.meterRegistry = meterRegistry");
         }
 
         classBuilder.addMethod(ctorBuilder.build());
@@ -166,7 +179,7 @@ public class SqlRepositoryProcessor extends AbstractProcessor {
 
         // Implement CRUD methods if FastRepository
         if (hasFastRepository && entityType != null && idType != null) {
-            generateCrudMethods(classBuilder, entityType, idType);
+            generateCrudMethods(classBuilder, entityType, idType, implClassName);
         }
 
         JavaFile.builder(packageName, classBuilder.build())
@@ -188,124 +201,263 @@ public class SqlRepositoryProcessor extends AbstractProcessor {
         }
         return false;
     }
+    
+    private boolean needsMetrics(TypeElement repositoryInterface) {
+        for (Element enclosed : repositoryInterface.getEnclosedElements()) {
+            if (enclosed.getKind() == ElementKind.METHOD) {
+                Select select = enclosed.getAnnotation(Select.class);
+                if (select != null && select.metrics()) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
 
-    private void generateCrudMethods(TypeSpec.Builder builder, TypeMirror entityType, TypeMirror idType) {
+    private void generateCrudMethods(TypeSpec.Builder builder, TypeMirror entityType, TypeMirror idType, String implClassName) {
         TypeName entityTypeName = TypeName.get(entityType);
         TypeName idTypeName = TypeName.get(idType);
         ClassName optionalClass = ClassName.get(Optional.class);
         ClassName listClass = ClassName.get(List.class);
         ClassName transactionalClass = ClassName.get("org.springframework.transaction.annotation", "Transactional");
+        ClassName mapSqlParamSource = ClassName.get("org.springframework.jdbc.core.namedparam", "MapSqlParameterSource");
 
-        // findById - read-only transaction
+        // Get entity metadata at compile time
+        TypeElement entityElement = (TypeElement) ((DeclaredType) entityType).asElement();
+        String tableName = extractTableName(entityElement);
+        List<FieldMapping> mappings = extractFieldMappings(entityElement);
+        FieldMapping idMapping = findIdField(mappings, entityElement);
+        
+        if (idMapping == null) {
+            logger.error("Entity " + entityElement + " must have an @Id field", entityElement);
+            return;
+        }
+
+        // Generate compile-time RowMapper as a static field
+        String rowMapperFieldName = "ROW_MAPPER";
+        CodeBlock rowMapperLambda = generateEntityRowMapper(entityElement, entityTypeName);
+        ClassName rowMapperClass = ClassName.get("org.springframework.jdbc.core", "RowMapper");
+        builder.addField(FieldSpec.builder(
+                ParameterizedTypeName.get(rowMapperClass, entityTypeName),
+                rowMapperFieldName,
+                Modifier.PRIVATE, Modifier.STATIC, Modifier.FINAL)
+                .initializer(rowMapperLambda)
+                .build());
+
+        // Build column list for SELECT (compile-time)
+        String selectColumns = mappings.stream()
+                .map(m -> m.columnName)
+                .reduce((a, b) -> a + ", " + b)
+                .orElse("*");
+
+        // findById - inline SQL
+        String findByIdSql = "SELECT " + selectColumns + " FROM " + tableName + " WHERE " + idMapping.columnName + " = :id";
         builder.addMethod(MethodSpec.methodBuilder("findById")
                 .addAnnotation(Override.class)
-                .addAnnotation(AnnotationSpec.builder(transactionalClass)
-                        .addMember("readOnly", "true")
-                        .build())
+                .addAnnotation(AnnotationSpec.builder(transactionalClass).addMember("readOnly", "true").build())
                 .addModifiers(Modifier.PUBLIC)
                 .returns(ParameterizedTypeName.get(optionalClass, entityTypeName))
                 .addParameter(idTypeName, "id")
-                .addStatement("return crudExecutor.findById(id)")
+                .addStatement("$T<$T> results = jdbcTemplate.query($S, $T.of($S, id), $N)",
+                        listClass, entityTypeName, findByIdSql, Map.class, "id", rowMapperFieldName)
+                .addStatement("return results.isEmpty() ? $T.empty() : $T.of(results.get(0))", optionalClass, optionalClass)
                 .build());
 
-        // findAll - read-only transaction
+        // findAll - inline SQL
+        String findAllSql = "SELECT " + selectColumns + " FROM " + tableName;
         builder.addMethod(MethodSpec.methodBuilder("findAll")
                 .addAnnotation(Override.class)
-                .addAnnotation(AnnotationSpec.builder(transactionalClass)
-                        .addMember("readOnly", "true")
-                        .build())
+                .addAnnotation(AnnotationSpec.builder(transactionalClass).addMember("readOnly", "true").build())
                 .addModifiers(Modifier.PUBLIC)
                 .returns(ParameterizedTypeName.get(listClass, entityTypeName))
-                .addStatement("return crudExecutor.findAll()")
+                .addStatement("return jdbcTemplate.query($S, $N)", findAllSql, rowMapperFieldName)
                 .build());
 
-        // save - write transaction
+        // save - generate INSERT with named parameters
+        String insertColumns = mappings.stream().map(m -> m.columnName).reduce((a, b) -> a + ", " + b).orElse("");
+        String insertValues = mappings.stream().map(m -> ":" + m.fieldName).reduce((a, b) -> a + ", " + b).orElse("");
+        String insertSql = "INSERT INTO " + tableName + " (" + insertColumns + ") VALUES (" + insertValues + ")";
+        
+        // UPDATE SQL with SET clause
+        String updateSetClause = mappings.stream()
+                .filter(m -> !m.fieldName.equals(idMapping.fieldName))
+                .map(m -> m.columnName + " = :" + m.fieldName)
+                .reduce((a, b) -> a + ", " + b)
+                .orElse("");
+        String updateSql = "UPDATE " + tableName + " SET " + updateSetClause + " WHERE " + idMapping.columnName + " = :" + idMapping.fieldName;
+        
+        // Generate a static helper method to convert entity to MapSqlParameterSource (zero reflection)
+        String toParamsMethodName = "toParams";
+        MethodSpec.Builder toParamsMethod = MethodSpec.methodBuilder(toParamsMethodName)
+                .addModifiers(Modifier.PRIVATE, Modifier.STATIC)
+                .returns(mapSqlParamSource)
+                .addParameter(entityTypeName, "entity");
+        
+        toParamsMethod.addStatement("$T params = new $T()", mapSqlParamSource, mapSqlParamSource);
+        for (FieldMapping mapping : mappings) {
+            String getter = "get" + capitalize(mapping.fieldName);
+            toParamsMethod.addStatement("params.addValue($S, entity.$N())", mapping.fieldName, getter);
+        }
+        toParamsMethod.addStatement("return params");
+        builder.addMethod(toParamsMethod.build());
+
+        // Generate save() method with compile-time parameter extraction
         builder.addMethod(MethodSpec.methodBuilder("save")
                 .addAnnotation(Override.class)
                 .addAnnotation(transactionalClass)
                 .addModifiers(Modifier.PUBLIC)
                 .returns(entityTypeName)
                 .addParameter(entityTypeName, "entity")
-                .addStatement("return ($T) crudExecutor.save(entity)", entityTypeName)
+                .addCode("// Check if entity exists (upsert logic)\n")
+                .addStatement("Object idValue = entity.$N()", "get" + capitalize(idMapping.fieldName))
+                .beginControlFlow("if (idValue == null || !existsById(($T) idValue))", idTypeName)
+                .addStatement("jdbcTemplate.update($S, $N(entity))", insertSql, toParamsMethodName)
+                .nextControlFlow("else")
+                .addStatement("jdbcTemplate.update($S, $N(entity))", updateSql, toParamsMethodName)
+                .endControlFlow()
+                .addStatement("return entity")
                 .build());
 
-        // saveAll - write transaction
+        // saveAll - batch insert with compile-time parameter extraction
         builder.addMethod(MethodSpec.methodBuilder("saveAll")
                 .addAnnotation(Override.class)
                 .addAnnotation(transactionalClass)
                 .addModifiers(Modifier.PUBLIC)
                 .returns(void.class)
                 .addParameter(ParameterizedTypeName.get(listClass, entityTypeName), "entities")
-                .addStatement("crudExecutor.saveAll(entities)")
+                .beginControlFlow("if (entities == null || entities.isEmpty())")
+                .addStatement("return")
+                .endControlFlow()
+                .addStatement("$T[] params = entities.stream().map($L::$N).toArray($T[]::new)",
+                        mapSqlParamSource, implClassName, toParamsMethodName, mapSqlParamSource)
+                .addStatement("jdbcTemplate.batchUpdate($S, params)", insertSql)
                 .build());
 
-        // updateAll - write transaction
+        // updateAll - batch update with compile-time parameter extraction
         builder.addMethod(MethodSpec.methodBuilder("updateAll")
                 .addAnnotation(Override.class)
                 .addAnnotation(transactionalClass)
                 .addModifiers(Modifier.PUBLIC)
                 .returns(void.class)
                 .addParameter(ParameterizedTypeName.get(listClass, entityTypeName), "entities")
-                .addStatement("crudExecutor.updateAll(entities)")
+                .beginControlFlow("if (entities == null || entities.isEmpty())")
+                .addStatement("return")
+                .endControlFlow()
+                .addStatement("$T[] params = entities.stream().map($L::$N).toArray($T[]::new)",
+                        mapSqlParamSource, implClassName, toParamsMethodName, mapSqlParamSource)
+                .addStatement("jdbcTemplate.batchUpdate($S, params)", updateSql)
                 .build());
 
-        // deleteById - write transaction
+        // deleteById - inline SQL
+        String deleteByIdSql = "DELETE FROM " + tableName + " WHERE " + idMapping.columnName + " = :id";
         builder.addMethod(MethodSpec.methodBuilder("deleteById")
                 .addAnnotation(Override.class)
                 .addAnnotation(transactionalClass)
                 .addModifiers(Modifier.PUBLIC)
                 .returns(void.class)
                 .addParameter(idTypeName, "id")
-                .addStatement("crudExecutor.deleteById(id)")
+                .addStatement("jdbcTemplate.update($S, $T.of($S, id))", deleteByIdSql, Map.class, "id")
                 .build());
 
-        // deleteAllById - write transaction
+        // deleteAllById - batch delete
         builder.addMethod(MethodSpec.methodBuilder("deleteAllById")
                 .addAnnotation(Override.class)
                 .addAnnotation(transactionalClass)
                 .addModifiers(Modifier.PUBLIC)
                 .returns(void.class)
                 .addParameter(ParameterizedTypeName.get(listClass, idTypeName), "ids")
-                .addStatement("crudExecutor.deleteAllById(ids)")
+                .beginControlFlow("if (ids == null || ids.isEmpty())")
+                .addStatement("return")
+                .endControlFlow()
+                .addStatement("$T[] params = ids.stream().map(id -> new $T($S, id)).toArray($T[]::new)",
+                        mapSqlParamSource, mapSqlParamSource, "id", mapSqlParamSource)
+                .addStatement("jdbcTemplate.batchUpdate($S, params)", deleteByIdSql)
                 .build());
 
-        // existsById - read-only transaction
+        // existsById - inline SQL
+        String existsByIdSql = "SELECT COUNT(*) FROM " + tableName + " WHERE " + idMapping.columnName + " = :id";
         builder.addMethod(MethodSpec.methodBuilder("existsById")
                 .addAnnotation(Override.class)
-                .addAnnotation(AnnotationSpec.builder(transactionalClass)
-                        .addMember("readOnly", "true")
-                        .build())
+                .addAnnotation(AnnotationSpec.builder(transactionalClass).addMember("readOnly", "true").build())
                 .addModifiers(Modifier.PUBLIC)
                 .returns(boolean.class)
                 .addParameter(idTypeName, "id")
-                .addStatement("return crudExecutor.existsById(id)")
+                .addStatement("$T count = jdbcTemplate.queryForObject($S, $T.of($S, id), $T.class)",
+                        Long.class, existsByIdSql, Map.class, "id", Long.class)
+                .addStatement("return count != null && count > 0")
                 .build());
 
-        // count - read-only transaction
+        // count - inline SQL
+        String countSql = "SELECT COUNT(*) FROM " + tableName;
         builder.addMethod(MethodSpec.methodBuilder("count")
                 .addAnnotation(Override.class)
-                .addAnnotation(AnnotationSpec.builder(transactionalClass)
-                        .addMember("readOnly", "true")
-                        .build())
+                .addAnnotation(AnnotationSpec.builder(transactionalClass).addMember("readOnly", "true").build())
                 .addModifiers(Modifier.PUBLIC)
                 .returns(long.class)
-                .addStatement("return crudExecutor.count()")
+                .addStatement("$T count = jdbcTemplate.queryForObject($S, new $T(), $T.class)",
+                        Long.class, countSql, mapSqlParamSource, Long.class)
+                .addStatement("return count != null ? count : 0")
                 .build());
 
-        // deleteAll - write transaction
+        // deleteAll - inline SQL
+        String deleteAllSql = "DELETE FROM " + tableName;
         builder.addMethod(MethodSpec.methodBuilder("deleteAll")
                 .addAnnotation(Override.class)
                 .addAnnotation(transactionalClass)
                 .addModifiers(Modifier.PUBLIC)
                 .returns(void.class)
-                .addStatement("crudExecutor.deleteAll()")
+                .addStatement("jdbcTemplate.update($S, new $T())", deleteAllSql, mapSqlParamSource)
                 .build());
+    }
+
+    /**
+     * Extracts table name from @Table annotation or derives from class name.
+     */
+    private String extractTableName(TypeElement entityElement) {
+        // Check for @Table annotation
+        for (AnnotationMirror ann : entityElement.getAnnotationMirrors()) {
+            if (ann.getAnnotationType().toString().equals("com.fast.cqrs.sql.repository.Table")) {
+                for (var entry : ann.getElementValues().entrySet()) {
+                    if (entry.getKey().getSimpleName().toString().equals("value")) {
+                        return entry.getValue().getValue().toString();
+                    }
+                }
+            }
+        }
+        // Default: convert class name to snake_case
+        return camelToSnake(entityElement.getSimpleName().toString());
+    }
+
+    /**
+     * Finds the @Id field from mappings.
+     */
+    private FieldMapping findIdField(List<FieldMapping> mappings, TypeElement entityElement) {
+        for (Element enclosed : entityElement.getEnclosedElements()) {
+            if (enclosed.getKind() == ElementKind.FIELD) {
+                VariableElement field = (VariableElement) enclosed;
+                if (field.getAnnotation(Id.class) != null) {
+                    String fieldName = field.getSimpleName().toString();
+                    return mappings.stream()
+                            .filter(m -> m.fieldName.equals(fieldName))
+                            .findFirst()
+                            .orElse(null);
+                }
+            }
+        }
+        // Fallback: look for field named "id"
+        return mappings.stream()
+                .filter(m -> m.fieldName.equalsIgnoreCase("id"))
+                .findFirst()
+                .orElse(null);
     }
 
     private MethodSpec generateSelectMethod(ExecutableElement method, Select select, String repositoryName) {
         String sql = select.value();
         String cache = select.cache();
         boolean hasCache = !cache.isEmpty();
+        boolean hasMetrics = select.metrics() && metricsAvailable;
+        String metricsName = select.metricsName().isEmpty() ? 
+                repositoryName + "." + method.getSimpleName() : select.metricsName();
         
         TypeMirror returnType = method.getReturnType();
         ClassName transactionalClass = ClassName.get("org.springframework.transaction.annotation", "Transactional");
@@ -314,6 +466,16 @@ public class SqlRepositoryProcessor extends AbstractProcessor {
                 .addAnnotation(AnnotationSpec.builder(transactionalClass)
                         .addMember("readOnly", "true")
                         .build());
+
+        // Start timer if metrics enabled
+        if (hasMetrics) {
+            builder.addCode("// Metrics\n");
+            builder.addStatement("$T sample = null", ClassName.get("io.micrometer.core.instrument", "Timer", "Sample"));
+            builder.beginControlFlow("if (meterRegistry != null)");
+            builder.addStatement("sample = $T.start(meterRegistry)", ClassName.get("io.micrometer.core.instrument", "Timer"));
+            builder.endControlFlow();
+            builder.beginControlFlow("try");
+        }
 
         // Build cache key if caching enabled
         if (hasCache) {
@@ -407,6 +569,14 @@ public class SqlRepositoryProcessor extends AbstractProcessor {
         }
 
         builder.addStatement("return $N", resultVar);
+
+        if (hasMetrics) {
+            builder.nextControlFlow("finally");
+            builder.beginControlFlow("if (sample != null)");
+            builder.addStatement("sample.stop(meterRegistry)");
+            builder.endControlFlow();
+            builder.endControlFlow();
+        }
 
         return builder.build();
     }

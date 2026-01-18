@@ -104,6 +104,9 @@ public class HttpControllerProcessor extends AbstractProcessor {
         Map<String, HandlerInfo> handlers = new LinkedHashMap<>();
         Map<ExecutableElement, HandlerInfo> methodHandlers = new HashMap<>();
         
+        // Collect DTO types for GraalVM reflection hints
+        Set<TypeName> dtoTypes = new LinkedHashSet<>();
+        
         for (Element enclosed : controllerInterface.getEnclosedElements()) {
             if (enclosed.getKind() == ElementKind.METHOD) {
                 ExecutableElement method = (ExecutableElement) enclosed;
@@ -112,6 +115,9 @@ public class HttpControllerProcessor extends AbstractProcessor {
                     handlers.put(handlerInfo.fieldName(), handlerInfo);
                     methodHandlers.put(method, handlerInfo);
                 }
+                
+                // Collect DTO types from parameters and return type
+                collectDtoTypes(method, dtoTypes);
             }
         }
 
@@ -172,6 +178,90 @@ public class HttpControllerProcessor extends AbstractProcessor {
                 .build();
 
         javaFile.writeTo(filer);
+        
+        // Generate RuntimeHints for GraalVM Native Image
+        if (!dtoTypes.isEmpty()) {
+            generateRuntimeHints(packageName, interfaceName, dtoTypes);
+        }
+    }
+    
+    /**
+     * Collects DTO types from method parameters and return type for GraalVM reflection hints.
+     */
+    private void collectDtoTypes(ExecutableElement method, Set<TypeName> dtoTypes) {
+        // Collect return type if it's a complex type
+        TypeMirror returnType = method.getReturnType();
+        if (isComplexDtoType(returnType)) {
+            dtoTypes.add(TypeName.get(returnType));
+        }
+        
+        // Collect parameter types
+        for (VariableElement param : method.getParameters()) {
+            TypeMirror paramType = param.asType();
+            if (isComplexDtoType(paramType)) {
+                dtoTypes.add(TypeName.get(paramType));
+            }
+        }
+    }
+    
+    /**
+     * Checks if a type is a complex DTO that needs reflection hints.
+     */
+    private boolean isComplexDtoType(TypeMirror type) {
+        if (type.getKind() != javax.lang.model.type.TypeKind.DECLARED) {
+            return false;
+        }
+        String typeName = type.toString();
+        // Exclude primitives, common JDK types, and void
+        if (typeName.startsWith("java.lang.") || 
+            typeName.startsWith("java.util.") ||
+            typeName.equals("void")) {
+            return false;
+        }
+        return true;
+    }
+    
+    /**
+     * Generates a RuntimeHintsRegistrar class for GraalVM Native Image support.
+     */
+    private void generateRuntimeHints(String packageName, String controllerName, Set<TypeName> dtoTypes) throws IOException {
+        String hintsClassName = controllerName + "_RuntimeHints";
+        
+        ClassName runtimeHintsRegistrar = ClassName.get("org.springframework.aot.hint", "RuntimeHintsRegistrar");
+        ClassName runtimeHints = ClassName.get("org.springframework.aot.hint", "RuntimeHints");
+        ClassName memberCategory = ClassName.get("org.springframework.aot.hint", "MemberCategory");
+        
+        // Build registerHints method body
+        CodeBlock.Builder registerBody = CodeBlock.builder();
+        for (TypeName dtoType : dtoTypes) {
+            registerBody.addStatement("hints.reflection().registerType($T.class, $T.INVOKE_DECLARED_CONSTRUCTORS, $T.INVOKE_DECLARED_METHODS, $T.DECLARED_FIELDS)",
+                    dtoType, memberCategory, memberCategory, memberCategory);
+        }
+        
+        TypeSpec hintsClass = TypeSpec.classBuilder(hintsClassName)
+                .addModifiers(Modifier.PUBLIC)
+                .addSuperinterface(runtimeHintsRegistrar)
+                .addAnnotation(AnnotationSpec.builder(ClassName.get("javax.annotation.processing", "Generated"))
+                        .addMember("value", "$S", HttpControllerProcessor.class.getCanonicalName())
+                        .build())
+                .addJavadoc("GraalVM Native Image reflection hints for DTOs used by {@link $L}.\n", controllerName)
+                .addJavadoc("<p>Register this class in META-INF/spring/aot.factories or use @ImportRuntimeHints.\n")
+                .addMethod(MethodSpec.methodBuilder("registerHints")
+                        .addAnnotation(Override.class)
+                        .addModifiers(Modifier.PUBLIC)
+                        .addParameter(runtimeHints, "hints")
+                        .addParameter(ClassName.get(ClassLoader.class), "classLoader")
+                        .addCode(registerBody.build())
+                        .build())
+                .build();
+        
+        JavaFile.builder(packageName, hintsClass)
+                .addFileComment("Auto-generated GraalVM Native Image hints by Fast CQRS Processor.")
+                .indent("    ")
+                .build()
+                .writeTo(filer);
+        
+        logger.note("Generated RuntimeHints for " + controllerName + " with " + dtoTypes.size() + " DTO types");
     }
 
     /**
@@ -236,13 +326,31 @@ public class HttpControllerProcessor extends AbstractProcessor {
         Query queryAnn = method.getAnnotation(Query.class);
         Command commandAnn = method.getAnnotation(Command.class);
 
-        MethodSpec.Builder builder = MethodSpec.overriding(method);
+        // Build method manually to ensure parameter annotations are copied
+        MethodSpec.Builder builder = MethodSpec.methodBuilder(method.getSimpleName().toString())
+                .addModifiers(Modifier.PUBLIC)
+                .addAnnotation(Override.class)
+                .returns(TypeName.get(method.getReturnType()));
 
         // Copy method-level Spring MVC annotations
         for (AnnotationMirror annotation : method.getAnnotationMirrors()) {
             if (shouldCopyAnnotation(annotation)) {
                 builder.addAnnotation(AnnotationSpec.get(annotation));
             }
+        }
+
+        // Copy parameters WITH their annotations (critical for @RequestBody, @PathVariable, @Valid, etc.)
+        for (VariableElement param : method.getParameters()) {
+            ParameterSpec.Builder paramBuilder = ParameterSpec.builder(
+                    TypeName.get(param.asType()),
+                    param.getSimpleName().toString());
+            
+            // Copy ALL parameter annotations
+            for (AnnotationMirror ann : param.getAnnotationMirrors()) {
+                paramBuilder.addAnnotation(AnnotationSpec.get(ann));
+            }
+            
+            builder.addParameter(paramBuilder.build());
         }
 
         // Generate security check if @PreAuthorize is present

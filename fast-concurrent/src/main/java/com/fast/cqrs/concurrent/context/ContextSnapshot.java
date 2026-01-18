@@ -111,34 +111,65 @@ public class ContextSnapshot {
         };
     }
 
-    // Spring Security integration (optional dependency)
-    private static Object captureSecurityContext() {
+    // Accessor strategy to avoid per-request reflection
+    private static final SecurityContextAccessor SECURITY_ACCESSOR;
+
+    static {
+        SecurityContextAccessor accessor;
         try {
-            Class<?> holder = Class.forName("org.springframework.security.core.context.SecurityContextHolder");
-            return holder.getMethod("getContext").invoke(null);
-        } catch (Exception e) {
-            return null; // Spring Security not available
+            Class.forName("org.springframework.security.core.context.SecurityContextHolder");
+            accessor = new SpringSecurityContextAccessor();
+        } catch (ClassNotFoundException e) {
+            accessor = new NoOpSecurityContextAccessor();
         }
+        SECURITY_ACCESSOR = accessor;
+    }
+
+    // Capture security context using the selected strategy
+    private static Object captureSecurityContext() {
+        return SECURITY_ACCESSOR.capture();
     }
 
     private static void restoreSecurityContext(Object context) {
-        if (context == null)
-            return;
-        try {
-            Class<?> holder = Class.forName("org.springframework.security.core.context.SecurityContextHolder");
-            holder.getMethod("setContext", Class.forName("org.springframework.security.core.context.SecurityContext"))
-                    .invoke(null, context);
-        } catch (Exception ignored) {
-            // Spring Security not available
-        }
+        SECURITY_ACCESSOR.restore(context);
     }
 
     private static void clearSecurityContext() {
-        try {
-            Class<?> holder = Class.forName("org.springframework.security.core.context.SecurityContextHolder");
-            holder.getMethod("clearContext").invoke(null);
-        } catch (Exception ignored) {
-            // Spring Security not available
+        SECURITY_ACCESSOR.clear();
+    }
+
+    // Strategy interface
+    private interface SecurityContextAccessor {
+        Object capture();
+        void restore(Object context);
+        void clear();
+    }
+
+    // No-op implementation
+    private static class NoOpSecurityContextAccessor implements SecurityContextAccessor {
+        @Override public Object capture() { return null; }
+        @Override public void restore(Object context) {}
+        @Override public void clear() {}
+    }
+
+    // Spring Security implementation (Classes loaded only if Spring Security is present)
+    private static class SpringSecurityContextAccessor implements SecurityContextAccessor {
+        @Override
+        public Object capture() {
+            return org.springframework.security.core.context.SecurityContextHolder.getContext();
+        }
+
+        @Override
+        public void restore(Object context) {
+            if (context instanceof org.springframework.security.core.context.SecurityContext) {
+                org.springframework.security.core.context.SecurityContextHolder.setContext(
+                    (org.springframework.security.core.context.SecurityContext) context);
+            }
+        }
+
+        @Override
+        public void clear() {
+            org.springframework.security.core.context.SecurityContextHolder.clearContext();
         }
     }
 }
