@@ -106,10 +106,6 @@ public class HttpControllerRegistrar implements ImportBeanDefinitionRegistrar {
             attributes = AnnotationAttributes.fromMap(
                 metadata.getAnnotationAttributes(EnableFast.class.getName())
             );
-        } else if (metadata.hasAnnotation(EnableCqrs.class.getName())) {
-            attributes = AnnotationAttributes.fromMap(
-                metadata.getAnnotationAttributes(EnableCqrs.class.getName())
-            );
         }
 
         if (attributes != null) {

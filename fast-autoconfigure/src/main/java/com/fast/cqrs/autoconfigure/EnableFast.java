@@ -56,4 +56,12 @@ public @interface EnableFast {
      * Enable strict naming convention enforcement.
      */
     boolean strict() default false;
+
+    /**
+     * Type-safe alternative to {@link #basePackages()} for specifying
+     * the packages to scan.
+     * <p>
+     * The package of each class specified will be scanned.
+     */
+    Class<?>[] basePackageClasses() default {};
 }
