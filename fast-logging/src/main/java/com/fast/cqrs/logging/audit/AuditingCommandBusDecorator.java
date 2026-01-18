@@ -2,6 +2,7 @@ package com.fast.cqrs.logging.audit;
 
 import com.fast.cqrs.cqrs.CommandBus;
 import com.fast.cqrs.logging.context.TraceContext;
+import com.fast.cqrs.security.FastSecurityContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -13,6 +14,9 @@ import org.slf4j.LoggerFactory;
  * <p>
  * This implements the Decorator pattern, allowing audit functionality to be
  * added without modifying the underlying CommandBus implementation.
+ * <p>
+ * <b>GraalVM Compatible:</b> Uses {@link FastSecurityContext} for type-safe
+ * security access without reflection.
  */
 public class AuditingCommandBusDecorator implements CommandBus {
 
@@ -67,29 +71,12 @@ public class AuditingCommandBusDecorator implements CommandBus {
     /**
      * Gets the current actor from the security context.
      * <p>
-     * Override this method to customize actor resolution.
+     * Uses {@link FastSecurityContext} for type-safe access without reflection.
      *
      * @return the current actor name, or "ANONYMOUS" if not authenticated
      */
     protected String getCurrentActor() {
-        try {
-            // Try to get actor from Spring Security if available
-            Class<?> securityContextHolder = Class.forName(
-                    "org.springframework.security.core.context.SecurityContextHolder"
-            );
-            Object context = securityContextHolder.getMethod("getContext").invoke(null);
-            Object authentication = context.getClass().getMethod("getAuthentication").invoke(context);
-
-            if (authentication != null) {
-                Object name = authentication.getClass().getMethod("getName").invoke(authentication);
-                if (name != null) {
-                    return name.toString();
-                }
-            }
-        } catch (Exception e) {
-            // Spring Security not available or not authenticated
-        }
-
-        return "ANONYMOUS";
+        // Type-safe access - no reflection!
+        return FastSecurityContext.getUsername();
     }
 }

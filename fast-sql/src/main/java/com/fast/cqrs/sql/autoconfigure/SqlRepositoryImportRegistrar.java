@@ -1,6 +1,5 @@
 package com.fast.cqrs.sql.autoconfigure;
 
-
 import com.fast.cqrs.sql.annotation.SqlRepository;
 
 import org.slf4j.Logger;
@@ -8,7 +7,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.AnnotatedBeanDefinition;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.beans.factory.support.BeanDefinitionRegistry;
-import org.springframework.beans.factory.support.GenericBeanDefinition;
 import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
 import org.springframework.context.annotation.ImportBeanDefinitionRegistrar;
 import org.springframework.core.annotation.AnnotationAttributes;
@@ -22,7 +20,18 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
- * Registrar that scans for @SqlRepository interfaces and registers proxy beans.
+ * Scans for {@code @SqlRepository} interfaces and verifies APT-generated implementations exist.
+ * <p>
+ * This registrar does NOT create dynamic proxies. All repository implementations must be
+ * generated at compile-time by the annotation processor. This design ensures:
+ * <ul>
+ *   <li>Zero reflection overhead at runtime</li>
+ *   <li>Full GraalVM native-image compatibility</li>
+ *   <li>Compile-time safety - missing implementations are detected early</li>
+ * </ul>
+ * <p>
+ * The APT-generated implementations are picked up by Spring's component scanning
+ * since they are annotated with {@code @Repository}.
  */
 public class SqlRepositoryImportRegistrar implements ImportBeanDefinitionRegistrar {
 
@@ -31,10 +40,8 @@ public class SqlRepositoryImportRegistrar implements ImportBeanDefinitionRegistr
     @Override
     public void registerBeanDefinitions(AnnotationMetadata importingClassMetadata,
                                         BeanDefinitionRegistry registry) {
-        System.out.println("DEBUG: SqlRepositoryImportRegistrar running for " + importingClassMetadata.getClassName());
 
         Set<String> basePackages = getBasePackages(importingClassMetadata);
-        System.out.println("DEBUG: Base packages: " + basePackages);
         log.info("Scanning for @SqlRepository interfaces in packages: {}", basePackages);
 
         ClassPathScanningCandidateComponentProvider scanner = createScanner();
@@ -43,7 +50,7 @@ public class SqlRepositoryImportRegistrar implements ImportBeanDefinitionRegistr
             Set<BeanDefinition> candidates = scanner.findCandidateComponents(basePackage);
 
             for (BeanDefinition candidate : candidates) {
-                registerRepositoryProxy(registry, candidate);
+                verifyGeneratedImplementation(candidate);
             }
         }
     }
@@ -61,46 +68,32 @@ public class SqlRepositoryImportRegistrar implements ImportBeanDefinitionRegistr
         return scanner;
     }
 
-    private void registerRepositoryProxy(BeanDefinitionRegistry registry, BeanDefinition candidate) {
+    /**
+     * Verifies that an APT-generated implementation exists for the repository interface.
+     * <p>
+     * The generated class is registered via Spring's component scanning (@Repository),
+     * so we don't need to manually register it here. We just verify it exists.
+     */
+    private void verifyGeneratedImplementation(BeanDefinition candidate) {
         String className = candidate.getBeanClassName();
         if (!StringUtils.hasText(className)) {
             return;
         }
 
+        String generatedClassName = className + "_FastImpl";
         try {
-            Class<?> repositoryInterface = ClassUtils.forName(className, getClass().getClassLoader());
-            String beanName = generateBeanName(repositoryInterface);
-
-            // Check for APT-generated implementation first (zero-overhead)
-            String generatedClassName = className + "_FastImpl";
-            try {
-                Class<?> generatedClass = ClassUtils.forName(generatedClassName, getClass().getClassLoader());
-                
-                // registry.registerBeanDefinition(beanName, beanDefinition);
-                log.info("Found APT-generated repository: {}. Skipping proxy registration to allow ComponentScan.", generatedClass.getSimpleName());
-                return;
-            } catch (ClassNotFoundException e) {
-                log.debug("No APT-generated implementation found for {}, using runtime proxy", repositoryInterface.getSimpleName());
-            }
-
-            // Fallback to runtime proxy
-            GenericBeanDefinition beanDefinition = new GenericBeanDefinition();
-            beanDefinition.setBeanClass(SqlRepositoryProxyFactoryBean.class);
-            beanDefinition.getConstructorArgumentValues().addGenericArgumentValue(repositoryInterface);
-            beanDefinition.setAutowireMode(GenericBeanDefinition.AUTOWIRE_BY_TYPE);
-            beanDefinition.setDependsOn("sqlRepositoryProxyFactory");
-
-            registry.registerBeanDefinition(beanName, beanDefinition);
-            log.debug("Registered SQL repository proxy: {} for interface: {}", beanName, className);
-
+            Class<?> generatedClass = ClassUtils.forName(generatedClassName, getClass().getClassLoader());
+            log.debug("Found APT-generated repository: {}", generatedClass.getSimpleName());
         } catch (ClassNotFoundException e) {
-            log.error("Failed to load repository interface: {}", className, e);
+            // No generated implementation found - this is an error in AOT-only mode
+            log.error("No APT-generated implementation found for @SqlRepository: {}. " +
+                      "Ensure the fast-processor annotation processor is configured in your build. " +
+                      "Dynamic proxy fallback is disabled for GraalVM native-image compatibility.", 
+                      className);
+            throw new IllegalStateException(
+                "Missing APT-generated implementation for " + className + "_FastImpl. " +
+                "Add fast-processor as an annotation processor to your build configuration.");
         }
-    }
-
-    private String generateBeanName(Class<?> repositoryInterface) {
-        String simpleName = repositoryInterface.getSimpleName();
-        return Character.toLowerCase(simpleName.charAt(0)) + simpleName.substring(1);
     }
 
     private Set<String> getBasePackages(AnnotationMetadata metadata) {

@@ -1,7 +1,5 @@
 package com.fast.cqrs.sql.autoconfigure;
 
-import com.fast.cqrs.sql.proxy.SqlRepositoryProxyFactory;
-
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -11,6 +9,10 @@ import javax.sql.DataSource;
 
 /**
  * Configuration for SQL Repository infrastructure beans.
+ * <p>
+ * <b>Note:</b> This configuration is simplified for GraalVM native-image compatibility.
+ * SQL repository proxies are removed. All repositories must be generated at compile-time
+ * by the annotation processor.
  */
 @Configuration
 public class SqlRepositoryConfiguration {
@@ -19,11 +21,5 @@ public class SqlRepositoryConfiguration {
     @ConditionalOnMissingBean
     public NamedParameterJdbcTemplate namedParameterJdbcTemplate(DataSource dataSource) {
         return new NamedParameterJdbcTemplate(dataSource);
-    }
-
-    @Bean
-    @ConditionalOnMissingBean
-    public SqlRepositoryProxyFactory sqlRepositoryProxyFactory(NamedParameterJdbcTemplate jdbcTemplate) {
-        return new SqlRepositoryProxyFactory(jdbcTemplate);
     }
 }

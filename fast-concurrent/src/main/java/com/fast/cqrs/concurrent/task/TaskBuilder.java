@@ -3,6 +3,7 @@ package com.fast.cqrs.concurrent.task;
 import com.fast.cqrs.concurrent.context.ContextSnapshot;
 import com.fast.cqrs.concurrent.event.TaskEvent;
 import com.fast.cqrs.concurrent.event.TaskEventListener;
+import com.fast.cqrs.concurrent.executor.ExecutorRegistry;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -206,8 +207,8 @@ public class TaskBuilder<T> {
  */
 class DefaultTask<T> implements Task<T> {
 
-    private static final ForkJoinPool FORK_JOIN = ForkJoinPool.commonPool();
-    private static final ExecutorService VIRTUAL_EXECUTOR = Executors.newVirtualThreadPerTaskExecutor();
+    // Cached direct executor - reused across all tasks
+    private static final ExecutorService DIRECT_EXECUTOR = MoreExecutors.directExecutor();
 
     private final String name;
     private final Supplier<T> supplier;
@@ -339,11 +340,11 @@ class DefaultTask<T> implements Task<T> {
 
     private ExecutorService getExecutor() {
         return switch (strategy) {
-            case VIRTUAL_THREAD -> VIRTUAL_EXECUTOR;
-            case FORK_JOIN -> FORK_JOIN;
-            case PLATFORM_THREAD -> Executors.newCachedThreadPool();
-            case CALLER -> MoreExecutors.directExecutor();
-            case AUTO -> VIRTUAL_EXECUTOR; // Default to virtual threads
+            case VIRTUAL_THREAD -> ExecutorRegistry.get(ExecutorRegistry.VIRTUAL);
+            case FORK_JOIN -> ForkJoinPool.commonPool();
+            case PLATFORM_THREAD -> ExecutorRegistry.get(ExecutorRegistry.IO);
+            case CALLER -> DIRECT_EXECUTOR;
+            case AUTO -> ExecutorRegistry.get(ExecutorRegistry.VIRTUAL);
         };
     }
 

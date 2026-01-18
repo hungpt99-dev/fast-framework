@@ -11,24 +11,31 @@ import java.lang.annotation.Target;
 /**
  * Marks a controller method as a query operation (read-only).
  * <p>
- * Query operations are dispatched through the {@link com.fast.cqrs.bus.QueryBus}.
+ * Query operations are dispatched through direct handler invocation for
+ * zero-overhead, GraalVM-compatible execution.
+ * 
+ * <h3>GraalVM Native Image Requirement</h3>
  * <p>
- * Example with handler:
+ * <b>IMPORTANT:</b> The {@link #handler()} attribute is <b>required</b> for
+ * GraalVM native-image compatibility. The annotation processor will fail
+ * compilation if a handler is not specified.
+ * 
+ * <h3>Example</h3>
  * <pre>{@code
  * @Query(handler = GetOrderHandler.class)
  * @GetMapping("/{id}")
- * OrderDto getOrder(@PathVariable String id);
+ * OrderDto getOrder(@PathVariable String id, @ModelAttribute GetOrderQuery query);
  * }</pre>
  * 
- * Example with performance options:
+ * <h3>With Performance Options</h3>
  * <pre>{@code
- * @Query(cache = "5m", metrics = "orders.get")
+ * @Query(handler = GetOrderHandler.class, cache = "5m", metrics = "orders.get")
  * @GetMapping("/{id}")
  * OrderDto getOrder(@PathVariable String id, @ModelAttribute GetOrderQuery query);
  * }</pre>
  *
  * @see Command
- * @see com.fast.cqrs.bus.QueryBus
+ * @see QueryHandler
  */
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
@@ -42,7 +49,17 @@ public @interface Query {
 
     /**
      * The handler class to route this query to.
-     * Framework creates query from method parameters and invokes handler.
+     * <p>
+     * <b>REQUIRED for GraalVM compatibility.</b> The annotation processor
+     * will report a compile error if this is not specified.
+     * <p>
+     * The handler is injected directly into the generated controller
+     * and invoked without any runtime reflection or bus dispatch.
+     * <p>
+     * Example:
+     * <pre>{@code
+     * @Query(handler = GetOrderHandler.class)
+     * }</pre>
      */
     Class<? extends QueryHandler<?, ?>> handler() default DefaultHandler.class;
 
@@ -97,6 +114,9 @@ public @interface Query {
 
     /**
      * Default placeholder handler.
+     * <p>
+     * <b>Note:</b> Using this default will cause a compile error.
+     * You must specify an explicit handler class.
      */
     interface DefaultHandler extends QueryHandler<Object, Object> {}
 }

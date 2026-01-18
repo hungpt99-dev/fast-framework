@@ -7,7 +7,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.AnnotatedBeanDefinition;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.beans.factory.support.BeanDefinitionRegistry;
-import org.springframework.beans.factory.support.GenericBeanDefinition;
 import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
 import org.springframework.context.annotation.ImportBeanDefinitionRegistrar;
 import org.springframework.core.annotation.AnnotationAttributes;
@@ -21,10 +20,18 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
- * Scans for {@code @HttpController} interfaces and registers them as Spring beans.
+ * Scans for {@code @HttpController} interfaces and verifies APT-generated implementations exist.
  * <p>
- * Implements {@link ImportBeanDefinitionRegistrar} to read annotation metadata
- * from {@code @EnableFast} or {@code @EnableCqrs}.
+ * This registrar does NOT create dynamic proxies. All controller implementations must be
+ * generated at compile-time by the annotation processor. This design ensures:
+ * <ul>
+ *   <li>Zero reflection overhead at runtime</li>
+ *   <li>Full GraalVM native-image compatibility</li>
+ *   <li>Compile-time safety - missing implementations are detected early</li>
+ * </ul>
+ * <p>
+ * The APT-generated implementations are picked up by Spring's component scanning
+ * since they are annotated with {@code @RestController}.
  */
 public class HttpControllerRegistrar implements ImportBeanDefinitionRegistrar {
 
@@ -43,7 +50,7 @@ public class HttpControllerRegistrar implements ImportBeanDefinitionRegistrar {
             Set<BeanDefinition> candidates = scanner.findCandidateComponents(basePackage);
             
             for (BeanDefinition candidate : candidates) {
-                registerControllerProxy(registry, candidate);
+                verifyGeneratedImplementation(candidate);
             }
         }
     }
@@ -62,55 +69,32 @@ public class HttpControllerRegistrar implements ImportBeanDefinitionRegistrar {
         return scanner;
     }
 
-    private void registerControllerProxy(BeanDefinitionRegistry registry, BeanDefinition candidate) {
+    /**
+     * Verifies that an APT-generated implementation exists for the controller interface.
+     * <p>
+     * The generated class is registered via Spring's component scanning (@RestController),
+     * so we don't need to manually register it here. We just verify it exists.
+     */
+    private void verifyGeneratedImplementation(BeanDefinition candidate) {
         String className = candidate.getBeanClassName();
         if (!StringUtils.hasText(className)) {
             return;
         }
 
+        String generatedClassName = className + "_FastImpl";
         try {
-            Class<?> controllerInterface = ClassUtils.forName(
-                className, 
-                getClass().getClassLoader()
-            );
-
-            String beanName = generateBeanName(controllerInterface);
-
-            // Check for APT-generated implementation first
-            String generatedClassName = className + "_FastImpl";
-            try {
-                Class<?> generatedClass = ClassUtils.forName(generatedClassName, getClass().getClassLoader());
-                log.info("Found APT-generated controller: {}. Skipping proxy registration.", generatedClass.getSimpleName());
-                return;
-            } catch (ClassNotFoundException e) {
-                // Continue to create proxy
-            }
-            int duplicateCount = 0;
-            String originalBeanName = beanName;
-            while (registry.containsBeanDefinition(beanName)) {
-                duplicateCount++;
-                beanName = originalBeanName + duplicateCount;
-            }
-            
-            GenericBeanDefinition beanDefinition = new GenericBeanDefinition();
-            beanDefinition.setBeanClass(ControllerProxyFactoryBean.class);
-            beanDefinition.getConstructorArgumentValues()
-                .addGenericArgumentValue(controllerInterface);
-            beanDefinition.setAutowireMode(GenericBeanDefinition.AUTOWIRE_BY_TYPE);
-            beanDefinition.setDependsOn("controllerProxyFactory");
-
-            registry.registerBeanDefinition(beanName, beanDefinition);
-            log.debug("Registered controller proxy bean: {} for interface: {}", 
-                     beanName, className);
-
+            Class<?> generatedClass = ClassUtils.forName(generatedClassName, getClass().getClassLoader());
+            log.debug("Found APT-generated controller: {}", generatedClass.getSimpleName());
         } catch (ClassNotFoundException e) {
-            log.error("Failed to load controller interface: {}", className, e);
+            // No generated implementation found - this is an error in AOT-only mode
+            log.error("No APT-generated implementation found for @HttpController: {}. " +
+                      "Ensure the fast-processor annotation processor is configured in your build. " +
+                      "Dynamic proxy fallback is disabled for GraalVM native-image compatibility.", 
+                      className);
+            throw new IllegalStateException(
+                "Missing APT-generated implementation for " + className + "_FastImpl. " +
+                "Add fast-processor as an annotation processor to your build configuration.");
         }
-    }
-
-    private String generateBeanName(Class<?> controllerInterface) {
-        String simpleName = controllerInterface.getSimpleName();
-        return Character.toLowerCase(simpleName.charAt(0)) + simpleName.substring(1);
     }
 
     private Set<String> getBasePackages(AnnotationMetadata metadata) {
@@ -132,7 +116,7 @@ public class HttpControllerRegistrar implements ImportBeanDefinitionRegistrar {
             String[] packages = attributes.getStringArray("basePackages");
             basePackages.addAll(Arrays.asList(packages));
             
-            // Handle basePackageClasses if present (EnableCqrs has it, EnableFast currently doesn't)
+            // Handle basePackageClasses if present
             if (attributes.containsKey("basePackageClasses")) {
                  Class<?>[] classes = attributes.getClassArray("basePackageClasses");
                  for (Class<?> clazz : classes) {

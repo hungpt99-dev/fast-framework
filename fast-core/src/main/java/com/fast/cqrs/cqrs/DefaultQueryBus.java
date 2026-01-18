@@ -85,15 +85,18 @@ public class DefaultQueryBus implements QueryBus {
     }
 
     private boolean hasOverriddenMethod(Class<?> clazz, String methodName) {
-        try {
-            for (Method method : clazz.getDeclaredMethods()) {
-                if (method.getName().equals(methodName)) {
-                    return true;
+        Class<?> current = clazz;
+        while (current != null && current != Object.class) {
+            try {
+                for (Method method : current.getDeclaredMethods()) {
+                    if (method.getName().equals(methodName)) {
+                        return true;
+                    }
                 }
+            } catch (Exception ignored) {
             }
-            return false;
-        } catch (Exception e) {
-            return false;
+            current = current.getSuperclass();
         }
+        return false;
     }
 }

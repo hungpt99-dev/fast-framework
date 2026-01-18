@@ -31,6 +31,9 @@ import java.util.concurrent.Callable;
  * fast-cli generate handler CreateOrder
  * fast-cli generate all Order
  * </pre>
+ * <p>
+ * <b>GraalVM Compatible:</b> Generated code uses explicit handler injection
+ * for compile-time safety and zero-reflection dispatch.
  */
 @Command(name = "fast-cli", mixinStandardHelpOptions = true, version = "1.0.0", description = "Fast Framework CLI - Code Generator and Developer Tools")
 public class FastCli implements Callable<Integer> {
@@ -144,6 +147,9 @@ class GenerateCommand implements Callable<Integer> {
  * ├── application/   # Handlers (Command/Query handlers)
  * └── infrastructure/ # Repositories, External integrations
  * </pre>
+ * <p>
+ * <b>GraalVM Compatible:</b> All generated controllers use explicit handler
+ * references for compile-time binding.
  */
 class FeatureGenerator {
 
@@ -171,6 +177,7 @@ class FeatureGenerator {
                 import com.fast.cqrs.cqrs.annotation.HttpController;
                 import com.fast.cqrs.cqrs.annotation.Query;
                 import com.fast.cqrs.cqrs.annotation.Command;
+                import %s.application.*;
                 import org.springframework.web.bind.annotation.*;
 
                 import java.util.List;
@@ -178,9 +185,8 @@ class FeatureGenerator {
                 /**
                  * REST API controller for %s feature.
                  * <p>
-                 * Query endpoints use @ModelAttribute to bind query parameters.
-                 * Handler is optional - if not specified, QueryBus auto-dispatches
-                 * based on the query type.
+                 * All methods specify explicit handlers for GraalVM native-image compatibility.
+                 * Handlers are injected at compile-time for zero-overhead dispatch.
                  */
                 @HttpController
                 @RequestMapping("/api/%s")
@@ -188,42 +194,59 @@ class FeatureGenerator {
 
                     /**
                      * Get single %s by ID.
-                     * Handler is optional - QueryBus will find handler by query type.
                      */
-                    @Query
+                    @Query(handler = Get%sHandler.class)
                     @GetMapping("/{id}")
                     %sDto get%s(@PathVariable String id, @ModelAttribute Get%sQuery query);
 
                     /**
                      * List %s with pagination and filters.
                      */
-                    @Query
+                    @Query(handler = List%sHandler.class)
                     @GetMapping
                     List<%sDto> list%s(@ModelAttribute List%sQuery query);
 
-                    @Command
+                    /**
+                     * Create a new %s.
+                     */
+                    @Command(handler = Create%sHandler.class)
                     @PostMapping
                     void create%s(@RequestBody Create%sCmd cmd);
 
-                    @Command
+                    /**
+                     * Update an existing %s.
+                     */
+                    @Command(handler = Update%sHandler.class)
                     @PutMapping("/{id}")
                     void update%s(@PathVariable String id, @RequestBody Update%sCmd cmd);
 
-                    @Command
+                    /**
+                     * Delete a %s.
+                     */
+                    @Command(handler = Delete%sHandler.class)
                     @DeleteMapping("/{id}")
                     void delete%s(@PathVariable String id);
                 }
                 """.formatted(
                 featurePackage(),
+                featurePackage(),
                 entityName,
                 feature + "s",
                 className,
                 entityName,
-                entityName, entityName, entityName,
                 entityName,
                 entityName, entityName, entityName,
+                entityName,
+                entityName,
+                entityName, entityName, entityName,
+                entityName,
+                entityName,
                 entityName, entityName,
+                entityName,
+                entityName,
                 entityName, entityName,
+                entityName,
+                entityName,
                 entityName);
 
         writeFile("api", className, content);
@@ -248,7 +271,7 @@ class FeatureGenerator {
 
                     @Override
                     public void handle(%sCmd cmd) {
-                        // TODO: Implement business logic
+                        // Implement business logic here
                     }
                 }
                 """.formatted(
@@ -434,7 +457,7 @@ class FeatureGenerator {
 
                     @Override
                     public %sDto handle(%sQuery query) {
-                        // TODO: Implement query logic
+                        // Implement query logic here
                         return null;
                     }
                 }
@@ -481,7 +504,7 @@ class FeatureGenerator {
 
                     @Override
                     public List<%sDto> handle(%sQuery query) {
-                        // TODO: Implement query logic
+                        // Implement query logic here
                         return List.of();
                     }
                 }
@@ -515,6 +538,7 @@ class FeatureGenerator {
 
         System.out.println("📦 Generating feature: " + feature);
         System.out.println("   Base package: " + featurePackage());
+        System.out.println("   GraalVM compatible: yes (explicit handler binding)");
         System.out.println();
 
         // Domain layer

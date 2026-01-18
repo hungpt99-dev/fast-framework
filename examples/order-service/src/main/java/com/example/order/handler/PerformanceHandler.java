@@ -3,13 +3,14 @@ package com.example.order.handler;
 import com.example.order.dto.PerformanceCmd;
 import com.fast.cqrs.cqrs.CommandHandler;
 import org.springframework.stereotype.Component;
+import com.example.order.repository.OrderRepository;
 
 @Component
 public class PerformanceHandler implements CommandHandler<PerformanceCmd> {
 
-    private final com.example.order.repository.OrderRepository repository;
+    private final OrderRepository repository;
 
-    public PerformanceHandler(@org.springframework.beans.factory.annotation.Qualifier("orderRepository_FastImpl") com.example.order.repository.OrderRepository repository) {
+    public PerformanceHandler(OrderRepository repository) {
         this.repository = repository;
     }
     

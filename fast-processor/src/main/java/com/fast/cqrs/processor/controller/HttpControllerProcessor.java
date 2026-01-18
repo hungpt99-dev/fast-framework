@@ -10,27 +10,38 @@ import com.squareup.javapoet.*;
 import javax.annotation.processing.*;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.*;
+import javax.lang.model.type.MirroredTypeException;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
 import java.io.IOException;
-import java.lang.annotation.Annotation;
 import java.util.*;
 
 /**
  * Annotation processor for {@link HttpController} interfaces.
  * <p>
- * Generates concrete controller implementation classes at compile-time,
- * eliminating runtime dynamic proxy overhead for HTTP request handling.
+ * Generates concrete controller implementation classes at compile-time.
+ * This processor is designed for GraalVM native-image compatibility:
+ * <ul>
+ *   <li>Zero reflection at runtime</li>
+ *   <li>Direct handler injection and invocation</li>
+ *   <li>Compile-time validation of handler specifications</li>
+ *   <li>Generated security checks from @PreAuthorize</li>
+ * </ul>
  * <p>
  * For each {@code @HttpController} interface, generates a class named
  * {@code <Interface>_FastImpl} that:
  * <ul>
  *   <li>Implements all interface methods</li>
- *   <li>Copies Spring MVC annotations (@GetMapping, @PostMapping, etc.)</li>
- *   <li>Routes @Query methods through QueryBus</li>
- *   <li>Routes @Command methods through CommandBus</li>
+ *   <li>Copies Spring MVC annotations</li>
+ *   <li>Injects handlers directly via constructor</li>
+ *   <li>Calls handlers directly (no bus dispatch)</li>
+ *   <li>Generates security checks inline</li>
  * </ul>
+ * <p>
+ * <b>IMPORTANT:</b> Every {@code @Query} and {@code @Command} method MUST specify
+ * an explicit {@code handler} attribute. Auto-discovery via QueryBus/CommandBus
+ * is not supported for GraalVM compatibility.
  *
  * @see HttpController
  * @see Query
@@ -45,21 +56,6 @@ public class HttpControllerProcessor extends AbstractProcessor {
     private Types typeUtils;
     private Filer filer;
     private ProcessorLogger logger;
-
-    // Spring MVC annotations to copy from interface to implementation
-    private static final Set<String> MVC_ANNOTATIONS = Set.of(
-            "org.springframework.web.bind.annotation.RequestMapping",
-            "org.springframework.web.bind.annotation.GetMapping",
-            "org.springframework.web.bind.annotation.PostMapping",
-            "org.springframework.web.bind.annotation.PutMapping",
-            "org.springframework.web.bind.annotation.DeleteMapping",
-            "org.springframework.web.bind.annotation.PatchMapping",
-            "org.springframework.web.bind.annotation.PathVariable",
-            "org.springframework.web.bind.annotation.RequestParam",
-            "org.springframework.web.bind.annotation.RequestBody",
-            "org.springframework.web.bind.annotation.RequestHeader",
-            "org.springframework.web.bind.annotation.ModelAttribute"
-    );
 
     @Override
     public synchronized void init(ProcessingEnvironment processingEnv) {
@@ -90,22 +86,50 @@ public class HttpControllerProcessor extends AbstractProcessor {
         return true;
     }
 
+    /**
+     * Handler info collected from method annotations.
+     */
+    private record HandlerInfo(
+        String fieldName,
+        TypeName typeName,
+        boolean isQueryHandler
+    ) {}
+
     private void generateControllerImplementation(TypeElement controllerInterface) throws IOException {
         String packageName = elementUtils.getPackageOf(controllerInterface).getQualifiedName().toString();
         String interfaceName = controllerInterface.getSimpleName().toString();
         String implClassName = interfaceName + "_FastImpl";
 
-        // Build the implementation class
+        // Collect all handlers from method annotations
+        Map<String, HandlerInfo> handlers = new LinkedHashMap<>();
+        Map<ExecutableElement, HandlerInfo> methodHandlers = new HashMap<>();
+        
+        for (Element enclosed : controllerInterface.getEnclosedElements()) {
+            if (enclosed.getKind() == ElementKind.METHOD) {
+                ExecutableElement method = (ExecutableElement) enclosed;
+                HandlerInfo handlerInfo = extractHandlerInfo(method);
+                if (handlerInfo != null) {
+                    handlers.put(handlerInfo.fieldName(), handlerInfo);
+                    methodHandlers.put(method, handlerInfo);
+                }
+            }
+        }
+
+        // Build the implementation class (NOT final - allows Spring AOP if needed)
         TypeSpec.Builder classBuilder = TypeSpec.classBuilder(implClassName)
-                .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
+                .addModifiers(Modifier.PUBLIC)  // Removed FINAL for Spring AOP compatibility
                 .addSuperinterface(TypeName.get(controllerInterface.asType()))
                 .addAnnotation(AnnotationSpec.builder(ClassName.get("javax.annotation.processing", "Generated"))
                         .addMember("value", "$S", HttpControllerProcessor.class.getCanonicalName())
                         .addMember("date", "$S", java.time.Instant.now().toString())
                         .build())
-                .addAnnotation(ClassName.get("org.springframework.web.bind.annotation", "RestController"))
+                .addAnnotation(AnnotationSpec.builder(ClassName.get("org.springframework.web.bind.annotation", "RestController"))
+                        .addMember("value", "$S", Character.toLowerCase(interfaceName.charAt(0)) + interfaceName.substring(1))
+                        .build())
                 .addJavadoc("Generated implementation for {@link $T}.\n", controllerInterface)
-                .addJavadoc("<p>This class is generated at compile-time by the Fast CQRS Processor.\n");
+                .addJavadoc("<p>This class is generated at compile-time for GraalVM native-image compatibility.\n")
+                .addJavadoc("<p>All handler invocations are direct method calls with zero reflection.\n")
+                .addJavadoc("<p>Security checks are generated inline from @PreAuthorize annotations.\n");
 
         // Copy class-level Spring MVC annotations
         for (AnnotationMirror annotation : controllerInterface.getAnnotationMirrors()) {
@@ -114,40 +138,101 @@ public class HttpControllerProcessor extends AbstractProcessor {
             }
         }
 
-        // Add QueryBus and CommandBus fields
-        ClassName queryBusClass = ClassName.get("com.fast.cqrs.cqrs", "QueryBus");
-        ClassName commandBusClass = ClassName.get("com.fast.cqrs.cqrs", "CommandBus");
-        
-        classBuilder.addField(FieldSpec.builder(queryBusClass, "queryBus", Modifier.PRIVATE, Modifier.FINAL).build());
-        classBuilder.addField(FieldSpec.builder(commandBusClass, "commandBus", Modifier.PRIVATE, Modifier.FINAL).build());
+        // Add fields for handlers (direct injection, no bus)
+        for (HandlerInfo handler : handlers.values()) {
+            classBuilder.addField(FieldSpec.builder(handler.typeName(), handler.fieldName(), 
+                    Modifier.PRIVATE, Modifier.FINAL).build());
+        }
 
-        // Add constructor
-        classBuilder.addMethod(MethodSpec.constructorBuilder()
-                .addModifiers(Modifier.PUBLIC)
-                .addParameter(queryBusClass, "queryBus")
-                .addParameter(commandBusClass, "commandBus")
-                .addStatement("this.queryBus = queryBus")
-                .addStatement("this.commandBus = commandBus")
-                .build());
+        // Build constructor with all handlers
+        MethodSpec.Builder ctorBuilder = MethodSpec.constructorBuilder()
+                .addModifiers(Modifier.PUBLIC);
+        
+        for (HandlerInfo handler : handlers.values()) {
+            ctorBuilder.addParameter(handler.typeName(), handler.fieldName());
+            ctorBuilder.addStatement("this.$N = $N", handler.fieldName(), handler.fieldName());
+        }
+        
+        classBuilder.addMethod(ctorBuilder.build());
 
         // Generate method implementations
         for (Element enclosed : controllerInterface.getEnclosedElements()) {
             if (enclosed.getKind() == ElementKind.METHOD) {
                 ExecutableElement method = (ExecutableElement) enclosed;
-                classBuilder.addMethod(generateMethodImplementation(method, controllerInterface));
+                HandlerInfo handlerInfo = methodHandlers.get(method);
+                classBuilder.addMethod(generateMethodImplementation(method, controllerInterface, handlerInfo));
             }
         }
 
         // Write the generated file
         JavaFile javaFile = JavaFile.builder(packageName, classBuilder.build())
                 .addFileComment("Auto-generated by Fast CQRS Processor. DO NOT EDIT.")
+                .addFileComment("\nThis class is GraalVM native-image compatible (zero reflection).")
                 .indent("    ")
                 .build();
 
         javaFile.writeTo(filer);
     }
 
-    private MethodSpec generateMethodImplementation(ExecutableElement method, TypeElement controllerInterface) {
+    /**
+     * Extracts handler info from @Query or @Command annotation.
+     * Returns null if no explicit handler is specified (will cause a compile error).
+     */
+    private HandlerInfo extractHandlerInfo(ExecutableElement method) {
+        Query queryAnn = method.getAnnotation(Query.class);
+        if (queryAnn != null) {
+            TypeMirror handlerType = getHandlerTypeMirror(queryAnn);
+            if (handlerType != null && !isDefaultHandler(handlerType, "Query$DefaultHandler")) {
+                String fieldName = generateFieldName(handlerType);
+                return new HandlerInfo(fieldName, TypeName.get(handlerType), true);
+            }
+        }
+        
+        Command commandAnn = method.getAnnotation(Command.class);
+        if (commandAnn != null) {
+            TypeMirror handlerType = getCommandHandlerTypeMirror(commandAnn);
+            if (handlerType != null && !isDefaultHandler(handlerType, "Command$DefaultHandler")) {
+                String fieldName = generateFieldName(handlerType);
+                return new HandlerInfo(fieldName, TypeName.get(handlerType), false);
+            }
+        }
+        
+        return null;
+    }
+
+    private TypeMirror getHandlerTypeMirror(Query annotation) {
+        try {
+            annotation.handler();
+            return null;
+        } catch (MirroredTypeException e) {
+            return e.getTypeMirror();
+        }
+    }
+
+    private TypeMirror getCommandHandlerTypeMirror(Command annotation) {
+        try {
+            annotation.handler();
+            return null;
+        } catch (MirroredTypeException e) {
+            return e.getTypeMirror();
+        }
+    }
+
+    private boolean isDefaultHandler(TypeMirror type, String defaultName) {
+        return type.toString().contains(defaultName);
+    }
+
+    private String generateFieldName(TypeMirror handlerType) {
+        String simpleName = handlerType.toString();
+        int lastDot = simpleName.lastIndexOf('.');
+        if (lastDot >= 0) {
+            simpleName = simpleName.substring(lastDot + 1);
+        }
+        return Character.toLowerCase(simpleName.charAt(0)) + simpleName.substring(1);
+    }
+
+    private MethodSpec generateMethodImplementation(ExecutableElement method, TypeElement controllerInterface, 
+                                                     HandlerInfo handlerInfo) {
         Query queryAnn = method.getAnnotation(Query.class);
         Command commandAnn = method.getAnnotation(Command.class);
 
@@ -160,10 +245,13 @@ public class HttpControllerProcessor extends AbstractProcessor {
             }
         }
 
+        // Generate security check if @PreAuthorize is present
+        generateSecurityCheck(builder, method);
+
         if (queryAnn != null) {
-            generateQueryDispatch(builder, method, queryAnn);
+            generateQueryDispatch(builder, method, handlerInfo);
         } else if (commandAnn != null) {
-            generateCommandDispatch(builder, method, commandAnn);
+            generateCommandDispatch(builder, method, handlerInfo);
         } else {
             logger.warning("Method " + method.getSimpleName() + " has no @Query or @Command annotation", method);
             builder.addStatement("throw new $T($S)",
@@ -174,42 +262,84 @@ public class HttpControllerProcessor extends AbstractProcessor {
         return builder.build();
     }
 
-    private void generateQueryDispatch(MethodSpec.Builder builder, ExecutableElement method, Query queryAnn) {
-        TypeMirror returnType = method.getReturnType();
-
-        // Find the query parameter (usually the first non-primitive parameter or @ModelAttribute)
-        VariableElement queryParam = findPayloadParameter(method);
-
-        if (queryParam != null) {
-            // Direct dispatch with query object
-            builder.addStatement("return queryBus.dispatch($N)", queryParam.getSimpleName());
-        } else if (method.getParameters().isEmpty()) {
-            // No parameters - create simple query wrapper
-            builder.addStatement("return queryBus.dispatch(new $T())",
-                    ClassName.get("com.fast.cqrs.cqrs.CqrsDispatcher", "SimpleQuery"));
-        } else {
-            // Build query from parameters
-            builder.addComment("TODO: Auto-construct query from parameters");
-            builder.addStatement("throw new $T($S)",
-                    UnsupportedOperationException.class,
-                    "Query parameter inference - coming in Phase 2");
+    /**
+     * Generates inline security check from @PreAuthorize annotation.
+     */
+    private void generateSecurityCheck(MethodSpec.Builder builder, ExecutableElement method) {
+        for (AnnotationMirror annotation : method.getAnnotationMirrors()) {
+            String annotationName = annotation.getAnnotationType().toString();
+            if (annotationName.equals("org.springframework.security.access.prepost.PreAuthorize")) {
+                // Extract the expression value
+                for (var entry : annotation.getElementValues().entrySet()) {
+                    if (entry.getKey().getSimpleName().toString().equals("value")) {
+                        String expression = entry.getValue().getValue().toString();
+                        // Generate inline security check
+                        builder.addStatement("if (!$T.evaluateExpression($S)) throw new $T($S)",
+                                ClassName.get("com.fast.cqrs.web", "SecurityInvocationInterceptor"),
+                                expression,
+                                ClassName.get("com.fast.cqrs.security", "FastSecurityContext", "SecurityException"),
+                                "Access is denied");
+                        return;
+                    }
+                }
+            }
         }
     }
 
-    private void generateCommandDispatch(MethodSpec.Builder builder, ExecutableElement method, Command commandAnn) {
-        // Find the command parameter
-        VariableElement commandParam = findPayloadParameter(method);
+    private void generateQueryDispatch(MethodSpec.Builder builder, ExecutableElement method, 
+                                        HandlerInfo handlerInfo) {
+        VariableElement queryParam = findPayloadParameter(method);
 
-        if (commandParam != null) {
-            builder.addStatement("commandBus.dispatch($N)", commandParam.getSimpleName());
-        } else {
-            builder.addComment("TODO: Auto-construct command from parameters");
+        if (handlerInfo == null) {
+            // No explicit handler - compile error for GraalVM compatibility
+            logger.error("@Query method '" + method.getSimpleName() + "' must specify handler attribute. " +
+                        "Auto-discovery is disabled for GraalVM native-image compatibility. " +
+                        "Example: @Query(handler = MyHandler.class)", method);
             builder.addStatement("throw new $T($S)",
                     UnsupportedOperationException.class,
-                    "Command parameter inference - coming in Phase 2");
+                    "Handler not specified - see compilation error");
+            return;
         }
 
-        // Void return
+        if (queryParam != null) {
+            // Direct handler invocation - zero overhead, zero reflection
+            builder.addStatement("return $N.handle($N)", handlerInfo.fieldName(), queryParam.getSimpleName());
+        } else {
+            logger.error("@Query method '" + method.getSimpleName() + 
+                        "' must have a query parameter (annotated with @RequestBody or @ModelAttribute)", method);
+            builder.addStatement("throw new $T($S)",
+                    UnsupportedOperationException.class,
+                    "Query parameter not found");
+        }
+    }
+
+    private void generateCommandDispatch(MethodSpec.Builder builder, ExecutableElement method, 
+                                          HandlerInfo handlerInfo) {
+        VariableElement commandParam = findPayloadParameter(method);
+
+        if (handlerInfo == null) {
+            // No explicit handler - compile error for GraalVM compatibility
+            logger.error("@Command method '" + method.getSimpleName() + "' must specify handler attribute. " +
+                        "Auto-discovery is disabled for GraalVM native-image compatibility. " +
+                        "Example: @Command(handler = MyHandler.class)", method);
+            builder.addStatement("throw new $T($S)",
+                    UnsupportedOperationException.class,
+                    "Handler not specified - see compilation error");
+            return;
+        }
+
+        if (commandParam != null) {
+            // Direct handler invocation - zero overhead, zero reflection
+            builder.addStatement("$N.handle($N)", handlerInfo.fieldName(), commandParam.getSimpleName());
+        } else {
+            logger.error("@Command method '" + method.getSimpleName() + 
+                        "' must have a command parameter (annotated with @RequestBody)", method);
+            builder.addStatement("throw new $T($S)",
+                    UnsupportedOperationException.class,
+                    "Command parameter not found");
+        }
+
+        // Handle return type
         TypeMirror returnType = method.getReturnType();
         if (returnType.getKind() != javax.lang.model.type.TypeKind.VOID) {
             builder.addStatement("return null");
@@ -244,12 +374,13 @@ public class HttpControllerProcessor extends AbstractProcessor {
     private boolean shouldCopyAnnotation(AnnotationMirror annotation) {
         String annotationType = annotation.getAnnotationType().toString();
         
-        // Exclude framework annotations that we handle or replace
+        // Exclude framework annotations
         if (annotationType.equals("com.fast.cqrs.cqrs.annotation.HttpController") ||
             annotationType.equals("com.fast.cqrs.cqrs.annotation.Query") ||
             annotationType.equals("com.fast.cqrs.cqrs.annotation.Command") ||
             annotationType.equals("java.lang.Override") ||
-            annotationType.equals("javax.annotation.processing.Generated")) {
+            annotationType.equals("javax.annotation.processing.Generated") ||
+            annotationType.equals("org.springframework.security.access.prepost.PreAuthorize")) {
             return false;
         }
         

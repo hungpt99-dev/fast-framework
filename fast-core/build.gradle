@@ -19,5 +19,8 @@ dependencies {
     
     // Testing
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
+
+    // Security (compileOnly to avoid forcing dependency)
+    compileOnly 'org.springframework.security:spring-security-core'
 }
 

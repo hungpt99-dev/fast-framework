@@ -11,24 +11,31 @@ import java.lang.annotation.Target;
 /**
  * Marks a controller method as a command operation (state-changing).
  * <p>
- * Command operations are dispatched through the {@link com.fast.cqrs.bus.CommandBus}.
+ * Command operations are dispatched through direct handler invocation for
+ * zero-overhead, GraalVM-compatible execution.
+ * 
+ * <h3>GraalVM Native Image Requirement</h3>
  * <p>
- * Example with handler:
+ * <b>IMPORTANT:</b> The {@link #handler()} attribute is <b>required</b> for
+ * GraalVM native-image compatibility. The annotation processor will fail
+ * compilation if a handler is not specified.
+ * 
+ * <h3>Example</h3>
  * <pre>{@code
  * @Command(handler = CreateOrderHandler.class)
  * @PostMapping
  * void createOrder(@RequestBody CreateOrderCmd cmd);
  * }</pre>
  * 
- * Example with performance options:
+ * <h3>With Performance Options</h3>
  * <pre>{@code
- * @Command(retry = 3, metrics = "orders.create")
+ * @Command(handler = CreateOrderHandler.class, retry = 3, metrics = "orders.create")
  * @PostMapping
  * void createOrder(@Valid @RequestBody CreateOrderCmd cmd);
  * }</pre>
  *
  * @see Query
- * @see com.fast.cqrs.bus.CommandBus
+ * @see CommandHandler
  */
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
@@ -42,6 +49,17 @@ public @interface Command {
 
     /**
      * The handler class to route this command to.
+     * <p>
+     * <b>REQUIRED for GraalVM compatibility.</b> The annotation processor
+     * will report a compile error if this is not specified.
+     * <p>
+     * The handler is injected directly into the generated controller
+     * and invoked without any runtime reflection or bus dispatch.
+     * <p>
+     * Example:
+     * <pre>{@code
+     * @Command(handler = CreateOrderHandler.class)
+     * }</pre>
      */
     Class<? extends CommandHandler<?>> handler() default DefaultHandler.class;
 
@@ -114,6 +132,9 @@ public @interface Command {
 
     /**
      * Default placeholder handler.
+     * <p>
+     * <b>Note:</b> Using this default will cause a compile error.
+     * You must specify an explicit handler class.
      */
     interface DefaultHandler extends CommandHandler<Object> {}
 }
