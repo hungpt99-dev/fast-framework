@@ -2,7 +2,7 @@ package com.fast.cqrs.concurrent.resilience;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import io.micrometer.core.instrument.MeterRegistry;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -20,12 +20,12 @@ public class KeyedSemaphoreRegistry {
     // Cache of Key -> Semaphore
     // Expire after access to prevent memory leaks for infinite keys
     private final Cache<String, Semaphore> semaphoreCache;
-    private final MeterRegistry meterRegistry;
+    private final Object meterRegistry;
 
-    public KeyedSemaphoreRegistry(MeterRegistry meterRegistry) {
+    public KeyedSemaphoreRegistry(Object meterRegistry) {
         this.meterRegistry = meterRegistry;
         this.semaphoreCache = Caffeine.newBuilder()
-                .expireAfterAccess(1, TimeUnit.HOURS) // Configurable?
+                .expireAfterAccess(1, TimeUnit.HOURS)
                 .maximumSize(100_000)
                 .build();
     }
@@ -36,7 +36,7 @@ public class KeyedSemaphoreRegistry {
         try {
             boolean acquired = sem.tryAcquire(timeoutMs, TimeUnit.MILLISECONDS);
             if (acquired && meterRegistry != null) {
-                meterRegistry.counter("fast.concurrent.keyed.acquired", "context", contextKey).increment();
+                MetricsHelper.incrementAcquired(meterRegistry, contextKey);
             }
             return acquired;
         } catch (InterruptedException e) {
@@ -55,5 +55,15 @@ public class KeyedSemaphoreRegistry {
 
     private Semaphore getSemaphore(String fullKey, int permits) {
         return semaphoreCache.get(fullKey, k -> new Semaphore(permits, true));
+    }
+
+    private static class MetricsHelper {
+        static void incrementAcquired(Object registryObj, String contextKey) {
+            if (registryObj instanceof io.micrometer.core.instrument.MeterRegistry) {
+                ((io.micrometer.core.instrument.MeterRegistry) registryObj)
+                    .counter("fast.concurrent.keyed.acquired", "context", contextKey)
+                    .increment();
+            }
+        }
     }
 }

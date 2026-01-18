@@ -6,6 +6,8 @@ import com.fast.cqrs.concurrent.event.TaskEventListener;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
+import java.util.concurrent.TimeUnit;
+/**
  * <p>
  * Usage:
  * 
@@ -74,11 +76,12 @@ public final class MicrometerMetrics {
         String taskName = event.taskName();
 
         switch (event) {
+
             case TaskEvent.Completed c -> {
                 Timer.builder("task.duration")
                         .tag("task", taskName)
                         .register(meterRegistry)
-                        .record(c.duration());
+                        .record(c.durationNanos(), TimeUnit.NANOSECONDS);
 
                 Counter.builder("task.completed")
                         .tag("task", taskName)

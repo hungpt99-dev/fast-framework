@@ -1,8 +1,7 @@
 package com.fast.cqrs.concurrent.resilience;
 
 import com.fast.cqrs.concurrent.spring.FastConcurrentProperties;
-import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.Tags;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -22,9 +21,9 @@ public class ConcurrencyRegistry {
     private final Map<String, Semaphore> semaphores = new ConcurrentHashMap<>();
     private final Map<String, AtomicInteger> activeCounts = new ConcurrentHashMap<>();
     private final FastConcurrentProperties properties;
-    private final MeterRegistry meterRegistry; // Optional
+    private final Object meterRegistry; // Opaque object to avoid hard dependency
 
-    public ConcurrencyRegistry(FastConcurrentProperties properties, MeterRegistry meterRegistry) {
+    public ConcurrencyRegistry(FastConcurrentProperties properties, Object meterRegistry) {
         this.properties = properties;
         this.meterRegistry = meterRegistry;
     }
@@ -55,7 +54,9 @@ public class ConcurrencyRegistry {
         return semaphores.computeIfAbsent(key, k -> {
             int permits = configuredPermits > 0 ? configuredPermits : properties.getPermits();
             Semaphore semaphore = new Semaphore(permits, true); // Fair semaphore
-            registerMetrics(k, semaphore);
+            if (this.meterRegistry != null) {
+                MetricsHelper.registerMetrics(this.meterRegistry, k, semaphore, activeCounts);
+            }
             return semaphore;
         });
     }
@@ -63,8 +64,8 @@ public class ConcurrencyRegistry {
     private void incrementActive(String key) {
         AtomicInteger active = activeCounts.computeIfAbsent(key, k -> new AtomicInteger(0));
         active.incrementAndGet();
-        if (meterRegistry != null) {
-            meterRegistry.counter("fast.concurrent.acquired", "key", key).increment();
+        if (this.meterRegistry != null) {
+            MetricsHelper.incrementAcquired(this.meterRegistry, key);
         }
     }
 
@@ -74,13 +75,30 @@ public class ConcurrencyRegistry {
             active.decrementAndGet();
         }
     }
+    
+    /**
+     * Inner class to isolate Micrometer dependencies.
+     * Loaded only if MeterRegistry is available and passed.
+     */
+    private static class MetricsHelper {
+        static void registerMetrics(Object registryObj, String key, Semaphore semaphore, Map<String, AtomicInteger> activeCounts) {
+            if (!(registryObj instanceof io.micrometer.core.instrument.MeterRegistry)) {
+                return;
+            }
+            io.micrometer.core.instrument.MeterRegistry registry = (io.micrometer.core.instrument.MeterRegistry) registryObj;
+            io.micrometer.core.instrument.Tags tags = io.micrometer.core.instrument.Tags.of("key", key);
+            
+            registry.gauge("fast.concurrent.available", tags, semaphore, Semaphore::availablePermits);
+            registry.gauge("fast.concurrent.active", tags, activeCounts.computeIfAbsent(key, k -> new AtomicInteger(0)), AtomicInteger::get);
+            registry.gauge("fast.concurrent.queue", tags, semaphore, s -> s.getQueueLength());
+        }
 
-    private void registerMetrics(String key, Semaphore semaphore) {
-        if (meterRegistry != null) {
-            Tags tags = Tags.of("key", key);
-            meterRegistry.gauge("fast.concurrent.available", tags, semaphore, Semaphore::availablePermits);
-            meterRegistry.gauge("fast.concurrent.active", tags, activeCounts.computeIfAbsent(key, k -> new AtomicInteger(0)), AtomicInteger::get);
-            meterRegistry.gauge("fast.concurrent.queue", tags, semaphore, s -> s.getQueueLength());
+        static void incrementAcquired(Object registryObj, String key) {
+            if (!(registryObj instanceof io.micrometer.core.instrument.MeterRegistry)) {
+                return;
+            }
+            io.micrometer.core.instrument.MeterRegistry registry = (io.micrometer.core.instrument.MeterRegistry) registryObj;
+            registry.counter("fast.concurrent.acquired", "key", key).increment();
         }
     }
 }
