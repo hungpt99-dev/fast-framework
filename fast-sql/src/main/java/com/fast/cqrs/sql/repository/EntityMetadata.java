@@ -1,5 +1,7 @@
 package com.fast.cqrs.sql.repository;
 
+import org.springframework.lang.Nullable;
+
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
@@ -104,7 +106,10 @@ public class EntityMetadata<T> {
 
     /**
      * Gets the ID value from an entity.
+     *
+     * @return the ID value, or null if not set (e.g., for new entities)
      */
+    @Nullable
     public Object getIdValue(T entity) {
         try {
             return idField.get(entity);

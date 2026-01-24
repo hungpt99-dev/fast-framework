@@ -12,6 +12,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
+import org.springframework.beans.factory.DisposableBean;
+
 /**
  * Default implementation of {@link CommandGateway}.
  * <p>
@@ -19,7 +21,7 @@ import java.util.function.Consumer;
  * timeout, retry, async execution, and callbacks.
  */
 @Component
-public class DefaultCommandGateway implements CommandGateway {
+public class DefaultCommandGateway implements CommandGateway, DisposableBean {
     
     private static final Logger log = LoggerFactory.getLogger(DefaultCommandGateway.class);
     
@@ -29,6 +31,19 @@ public class DefaultCommandGateway implements CommandGateway {
     public DefaultCommandGateway(CommandBus commandBus) {
         this.commandBus = commandBus;
         this.executor = Executors.newVirtualThreadPerTaskExecutor();
+    }
+    
+    @Override
+    public void destroy() {
+        executor.shutdown();
+        try {
+            if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
+                executor.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            executor.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
     }
     
     @Override

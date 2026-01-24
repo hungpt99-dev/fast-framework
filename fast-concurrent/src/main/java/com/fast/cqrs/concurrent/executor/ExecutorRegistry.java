@@ -189,12 +189,12 @@ public final class ExecutorRegistry {
                     max <= 0 ? Runtime.getRuntime().availableProcessors() : max,
                     60L, TimeUnit.SECONDS,
                     new LinkedBlockingQueue<>(queue),
-                    new ThreadPoolExecutor.CallerRunsPolicy());
+                    new ThreadPoolExecutor.AbortPolicy());
             case IO, BLOCKING -> new ThreadPoolExecutor(
                     core, max,
                     60L, TimeUnit.SECONDS,
                     new LinkedBlockingQueue<>(queue),
-                    new ThreadPoolExecutor.CallerRunsPolicy());
+                    new ThreadPoolExecutor.AbortPolicy());
             case CUSTOM -> throw new IllegalArgumentException("Use register(name, executor) for custom");
         };
     }

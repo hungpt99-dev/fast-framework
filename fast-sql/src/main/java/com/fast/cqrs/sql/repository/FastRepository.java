@@ -1,5 +1,7 @@
 package com.fast.cqrs.sql.repository;
 
+import org.springframework.lang.Nullable;
+
 import java.util.List;
 import java.util.Optional;
 

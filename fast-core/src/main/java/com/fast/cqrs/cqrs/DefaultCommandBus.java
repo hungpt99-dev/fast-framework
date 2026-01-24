@@ -90,8 +90,7 @@ public class DefaultCommandBus implements CommandBus {
             if (hasCustomOnError.contains(commandType)) {
                 handler.onError(command, error, ctx);
             } else {
-                throw error instanceof RuntimeException ? (RuntimeException) error 
-                    : new RuntimeException(error);
+                throw new CqrsDispatchException("Command dispatch failed: " + commandType.getSimpleName(), error);
             }
         }
     }
@@ -105,7 +104,9 @@ public class DefaultCommandBus implements CommandBus {
                         return true;
                     }
                 }
-            } catch (Exception ignored) {
+            } catch (Exception e) {
+                // Method scan failure is non-critical, log at debug level
+                log.debug("Failed to scan methods in {}: {}", current.getName(), e.getMessage());
             }
             current = current.getSuperclass();
         }

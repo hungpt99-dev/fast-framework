@@ -93,7 +93,9 @@ public class DefaultQueryBus implements QueryBus {
                         return true;
                     }
                 }
-            } catch (Exception ignored) {
+            } catch (Exception e) {
+                // Method scan failure is non-critical, log at debug level
+                log.debug("Failed to scan methods in {}: {}", current.getName(), e.getMessage());
             }
             current = current.getSuperclass();
         }

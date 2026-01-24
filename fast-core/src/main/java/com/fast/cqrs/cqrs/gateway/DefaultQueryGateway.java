@@ -15,6 +15,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
+import org.springframework.beans.factory.DisposableBean;
+
 /**
  * Default implementation of {@link QueryGateway}.
  * <p>
@@ -22,7 +24,7 @@ import java.util.function.Supplier;
  * caching, timeout, fallback, and parallel execution.
  */
 @Component
-public class DefaultQueryGateway implements QueryGateway {
+public class DefaultQueryGateway implements QueryGateway, DisposableBean {
     
     private static final Logger log = LoggerFactory.getLogger(DefaultQueryGateway.class);
     
@@ -32,6 +34,19 @@ public class DefaultQueryGateway implements QueryGateway {
     public DefaultQueryGateway(QueryBus queryBus) {
         this.queryBus = queryBus;
         this.executor = Executors.newVirtualThreadPerTaskExecutor();
+    }
+    
+    @Override
+    public void destroy() {
+        executor.shutdown();
+        try {
+            if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
+                executor.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            executor.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
     }
     
     @Override

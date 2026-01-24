@@ -368,8 +368,10 @@ class DefaultTask<T> implements Task<T> {
         for (TaskEventListener listener : listeners) {
             try {
                 listener.onEvent(event);
-            } catch (Exception ignored) {
-                // Don't let listener errors affect task execution
+            } catch (Exception e) {
+                if (trace) {
+                    log.warn("[TASK] Listener error for '{}': {}", name, e.getMessage());
+                }
             }
         }
     }

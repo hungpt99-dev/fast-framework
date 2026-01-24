@@ -33,7 +33,7 @@ public class CrudExecutor<T, ID> {
 
     public Optional<T> findById(ID id) {
         String sql = CrudSqlGenerator.selectById(metadata);
-        log.debug("Executing findById: {}", sql);
+        log.trace("Executing findById: {}", sql);
         
         Map<String, Object> params = Map.of("id", id);
         List<T> results = jdbcTemplate.query(sql, params, rowMapper);
@@ -43,7 +43,7 @@ public class CrudExecutor<T, ID> {
 
     public List<T> findAll() {
         String sql = CrudSqlGenerator.selectAll(metadata);
-        log.debug("Executing findAll: {}", sql);
+        log.trace("Executing findAll: {}", sql);
         
         return jdbcTemplate.query(sql, rowMapper);
     }
@@ -54,7 +54,7 @@ public class CrudExecutor<T, ID> {
         
         // Get page content
         String sql = CrudSqlGenerator.selectAllPaged(metadata, pageable);
-        log.debug("Executing findAll paged: {}", sql);
+        log.trace("Executing findAll paged: {}", sql);
         
         Map<String, Object> params = Map.of(
             "limit", pageable.size(),
@@ -67,23 +67,25 @@ public class CrudExecutor<T, ID> {
 
     public List<T> findAll(Sort sort) {
         String sql = CrudSqlGenerator.selectAllSorted(metadata, sort);
-        log.debug("Executing findAll sorted: {}", sql);
+        log.trace("Executing findAll sorted: {}", sql);
         
         return jdbcTemplate.query(sql, rowMapper);
     }
 
+    @SuppressWarnings("unchecked")
     public T save(T entity) {
-        ID id = (ID) metadata.getIdValue(entity);
+        Object idValue = metadata.getIdValue(entity);
+        ID id = idValue != null ? (ID) idValue : null;
         
         if (id == null || !existsById(id)) {
             // Insert
             String sql = CrudSqlGenerator.insert(metadata);
-            log.debug("Executing insert: {}", sql);
+            log.trace("Executing insert: {}", sql);
             jdbcTemplate.update(sql, new BeanPropertySqlParameterSource(entity));
         } else {
             // Update
             String sql = CrudSqlGenerator.update(metadata);
-            log.debug("Executing update: {}", sql);
+            log.trace("Executing update: {}", sql);
             
             Map<String, Object> params = new HashMap<>();
             params.put("id", id);
@@ -102,7 +104,7 @@ public class CrudExecutor<T, ID> {
         }
 
         String sql = CrudSqlGenerator.insert(metadata);
-        log.debug("Executing batch insert: {} ({} entities)", sql, entities.size());
+        log.trace("Executing batch insert: {} ({} entities)", sql, entities.size());
 
         BeanPropertySqlParameterSource[] batchParams = entities.stream()
             .map(BeanPropertySqlParameterSource::new)
@@ -121,7 +123,7 @@ public class CrudExecutor<T, ID> {
         }
 
         String sql = CrudSqlGenerator.update(metadata);
-        log.debug("Executing batch update: {} ({} entities)", sql, entities.size());
+        log.trace("Executing batch update: {} ({} entities)", sql, entities.size());
 
         MapSqlParameterSource[] batchParams = entities.stream()
             .map(entity -> {
@@ -146,7 +148,7 @@ public class CrudExecutor<T, ID> {
         }
 
         String sql = CrudSqlGenerator.deleteById(metadata);
-        log.debug("Executing batch delete: {} ({} ids)", sql, ids.size());
+        log.trace("Executing batch delete: {} ({} ids)", sql, ids.size());
 
         MapSqlParameterSource[] batchParams = ids.stream()
             .map(id -> new MapSqlParameterSource("id", id))
@@ -157,21 +159,21 @@ public class CrudExecutor<T, ID> {
 
     public void deleteById(ID id) {
         String sql = CrudSqlGenerator.deleteById(metadata);
-        log.debug("Executing deleteById: {}", sql);
+        log.trace("Executing deleteById: {}", sql);
         
         jdbcTemplate.update(sql, Map.of("id", id));
     }
 
     public void deleteAll() {
         String sql = CrudSqlGenerator.deleteAll(metadata);
-        log.debug("Executing deleteAll: {}", sql);
+        log.trace("Executing deleteAll: {}", sql);
         
         jdbcTemplate.update(sql, new MapSqlParameterSource());
     }
 
     public boolean existsById(ID id) {
         String sql = CrudSqlGenerator.existsById(metadata);
-        log.debug("Executing existsById: {}", sql);
+        log.trace("Executing existsById: {}", sql);
         
         Long count = jdbcTemplate.queryForObject(sql, Map.of("id", id), Long.class);
         return count != null && count > 0;
@@ -179,7 +181,7 @@ public class CrudExecutor<T, ID> {
 
     public long count() {
         String sql = CrudSqlGenerator.count(metadata);
-        log.debug("Executing count: {}", sql);
+        log.trace("Executing count: {}", sql);
         
         Long count = jdbcTemplate.queryForObject(sql, new MapSqlParameterSource(), Long.class);
         return count != null ? count : 0;
