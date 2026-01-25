@@ -123,6 +123,19 @@ public @interface Command {
     String idempotencyKey() default "";
 
     /**
+     * Time-to-live for idempotency records.
+     * <p>
+     * Controls how long the idempotency key is remembered.
+     * After expiration, the same key will trigger a new execution.
+     * <p>
+     * Format: number + unit (s/m/h/d)
+     * Examples: "30s", "5m", "1h", "24h", "7d"
+     * <p>
+     * Default: "24h"
+     */
+    String idempotencyTtl() default "24h";
+
+    /**
      * Execute command asynchronously.
      * <p>
      * If true, the method returns immediately and command executes in background.

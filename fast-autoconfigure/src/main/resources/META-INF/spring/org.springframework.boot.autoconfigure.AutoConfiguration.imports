@@ -1,1 +1,2 @@
 com.fast.cqrs.autoconfigure.CqrsAutoConfiguration
+com.fast.cqrs.autoconfigure.CqrsFeaturesAutoConfiguration

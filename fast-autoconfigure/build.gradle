@@ -15,6 +15,10 @@ dependencies {
     // Classpath scanning
     implementation 'org.springframework:spring-context'
     
+    // AOP for caching and idempotency aspects
+    implementation 'org.springframework:spring-aop'
+    implementation 'org.aspectj:aspectjweaver:1.9.22.1'
+    
     // Logging
     implementation 'org.slf4j:slf4j-api'
     

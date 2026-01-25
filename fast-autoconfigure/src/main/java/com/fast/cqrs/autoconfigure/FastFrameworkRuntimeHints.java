@@ -29,6 +29,9 @@ public class FastFrameworkRuntimeHints implements RuntimeHintsRegistrar {
         
         // Concurrent module reflection hints
         registerConcurrentModuleHints(hints);
+        
+        // CQRS features (caching, idempotency)
+        registerCqrsFeaturesHints(hints);
     }
 
     private void registerSqlModuleHints(RuntimeHints hints) {
@@ -81,4 +84,41 @@ public class FastFrameworkRuntimeHints implements RuntimeHintsRegistrar {
             // Concurrent module not on classpath, skip
         }
     }
+
+    private void registerCqrsFeaturesHints(RuntimeHints hints) {
+        // Register caching and idempotency aspects
+        try {
+            Class<?> queryCacheAspect = Class.forName(
+                    "com.fast.cqrs.cqrs.cache.QueryCacheAspect");
+            hints.reflection().registerType(queryCacheAspect,
+                    MemberCategory.INVOKE_DECLARED_CONSTRUCTORS,
+                    MemberCategory.INVOKE_DECLARED_METHODS);
+
+            Class<?> idempotencyAspect = Class.forName(
+                    "com.fast.cqrs.cqrs.idempotency.IdempotencyAspect");
+            hints.reflection().registerType(idempotencyAspect,
+                    MemberCategory.INVOKE_DECLARED_CONSTRUCTORS,
+                    MemberCategory.INVOKE_DECLARED_METHODS);
+        } catch (ClassNotFoundException e) {
+            // CQRS features not on classpath, skip
+        }
+
+        // SpEL requires these for evaluation
+        try {
+            Class<?> spelParser = Class.forName(
+                    "org.springframework.expression.spel.standard.SpelExpressionParser");
+            hints.reflection().registerType(spelParser,
+                    MemberCategory.INVOKE_DECLARED_CONSTRUCTORS,
+                    MemberCategory.INVOKE_DECLARED_METHODS);
+
+            Class<?> spelContext = Class.forName(
+                    "org.springframework.expression.spel.support.StandardEvaluationContext");
+            hints.reflection().registerType(spelContext,
+                    MemberCategory.INVOKE_DECLARED_CONSTRUCTORS,
+                    MemberCategory.INVOKE_DECLARED_METHODS);
+        } catch (ClassNotFoundException e) {
+            // SpEL not on classpath, skip
+        }
+    }
 }
+
