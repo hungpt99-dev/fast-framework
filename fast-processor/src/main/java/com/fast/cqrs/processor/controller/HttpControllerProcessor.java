@@ -49,7 +49,7 @@ import java.util.*;
  */
 @AutoService(Processor.class)
 @SupportedAnnotationTypes("com.fast.cqrs.cqrs.annotation.HttpController")
-@SupportedSourceVersion(SourceVersion.RELEASE_21)
+@SupportedSourceVersion(SourceVersion.RELEASE_25)
 public class HttpControllerProcessor extends AbstractProcessor {
 
     private Elements elementUtils;
@@ -125,7 +125,7 @@ public class HttpControllerProcessor extends AbstractProcessor {
         TypeSpec.Builder classBuilder = TypeSpec.classBuilder(implClassName)
                 .addModifiers(Modifier.PUBLIC)  // Removed FINAL for Spring AOP compatibility
                 .addSuperinterface(TypeName.get(controllerInterface.asType()))
-                .addAnnotation(AnnotationSpec.builder(ClassName.get("javax.annotation.processing", "Generated"))
+                .addAnnotation(AnnotationSpec.builder(ClassName.get("jakarta.annotation", "Generated"))
                         .addMember("value", "$S", HttpControllerProcessor.class.getCanonicalName())
                         .addMember("date", "$S", java.time.Instant.now().toString())
                         .build())
@@ -241,7 +241,7 @@ public class HttpControllerProcessor extends AbstractProcessor {
         TypeSpec hintsClass = TypeSpec.classBuilder(hintsClassName)
                 .addModifiers(Modifier.PUBLIC)
                 .addSuperinterface(runtimeHintsRegistrar)
-                .addAnnotation(AnnotationSpec.builder(ClassName.get("javax.annotation.processing", "Generated"))
+                .addAnnotation(AnnotationSpec.builder(ClassName.get("jakarta.annotation", "Generated"))
                         .addMember("value", "$S", HttpControllerProcessor.class.getCanonicalName())
                         .build())
                 .addJavadoc("GraalVM Native Image reflection hints for DTOs used by {@link $L}.\n", controllerName)
@@ -487,7 +487,7 @@ public class HttpControllerProcessor extends AbstractProcessor {
             annotationType.equals("com.fast.cqrs.cqrs.annotation.Query") ||
             annotationType.equals("com.fast.cqrs.cqrs.annotation.Command") ||
             annotationType.equals("java.lang.Override") ||
-            annotationType.equals("javax.annotation.processing.Generated") ||
+            annotationType.equals("jakarta.annotation.Generated") ||
             annotationType.equals("org.springframework.security.access.prepost.PreAuthorize")) {
             return false;
         }

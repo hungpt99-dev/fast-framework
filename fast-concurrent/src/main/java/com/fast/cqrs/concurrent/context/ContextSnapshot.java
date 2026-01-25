@@ -3,18 +3,20 @@ package com.fast.cqrs.concurrent.context;
 import org.slf4j.MDC;
 
 import java.util.concurrent.Callable;
-
 import java.util.HashMap;
 import java.util.Map;
 
 /**
  * Captures and restores execution context for async operations.
  * <p>
+ * Optimized for virtual threads (Java 21+) while maintaining backwards 
+ * compatibility with platform threads.
+ * <p>
  * Supports:
  * <ul>
  * <li>SLF4J MDC (logging context)</li>
  * <li>Spring SecurityContext</li>
- * <li>Custom ThreadLocal values</li>
+ * <li>Custom context values via {@link ContextRegistry}</li>
  * </ul>
  * <p>
  * Usage:
@@ -22,25 +24,20 @@ import java.util.Map;
  * <pre>{@code
  * ContextSnapshot snapshot = ContextSnapshot.capture();
  * 
- * executor.submit(() -> {
- *     snapshot.restore();
- *     try {
- *         // MDC and SecurityContext are now available
- *         doWork();
- *     } finally {
- *         snapshot.clear();
- *     }
- * });
+ * executor.submit(snapshot.wrap(() -> {
+ *     // MDC, SecurityContext, and custom context are now available
+ *     doWork();
+ * }));
  * }</pre>
  */
 public class ContextSnapshot {
 
     private final Map<String, String> mdcContext;
     private final Object securityContext;
-    private final Map<ThreadLocal<?>, Object> customContext;
+    private final Map<String, Object> customContext;
 
     private ContextSnapshot(Map<String, String> mdcContext, Object securityContext,
-            Map<ThreadLocal<?>, Object> customContext) {
+            Map<String, Object> customContext) {
         this.mdcContext = mdcContext;
         this.securityContext = securityContext;
         this.customContext = customContext;
@@ -52,7 +49,7 @@ public class ContextSnapshot {
     public static ContextSnapshot capture() {
         Map<String, String> mdc = MDC.getCopyOfContextMap();
         Object security = captureSecurityContext();
-        Map<ThreadLocal<?>, Object> custom = ContextRegistry.captureAll();
+        Map<String, Object> custom = ContextRegistry.captureAll();
 
         return new ContextSnapshot(
                 mdc != null ? new HashMap<>(mdc) : new HashMap<>(),
@@ -72,7 +69,7 @@ public class ContextSnapshot {
         // Restore SecurityContext
         restoreSecurityContext(securityContext);
 
-        // Restore custom ThreadLocals
+        // Restore custom context
         ContextRegistry.restoreAll(customContext);
     }
 
@@ -121,6 +118,34 @@ public class ContextSnapshot {
             restore();
             try {
                 return callable.call();
+            } finally {
+                clear();
+            }
+        };
+    }
+
+    /**
+     * Returns a consumer that wraps the given consumer with context propagation.
+     */
+    public <T> java.util.function.Consumer<T> wrap(java.util.function.Consumer<T> consumer) {
+        return (t) -> {
+            restore();
+            try {
+                consumer.accept(t);
+            } finally {
+                clear();
+            }
+        };
+    }
+
+    /**
+     * Returns a function that wraps the given function with context propagation.
+     */
+    public <T, R> java.util.function.Function<T, R> wrap(java.util.function.Function<T, R> function) {
+        return (t) -> {
+            restore();
+            try {
+                return function.apply(t);
             } finally {
                 clear();
             }

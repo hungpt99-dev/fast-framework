@@ -38,7 +38,7 @@ import java.util.*;
  */
 @AutoService(Processor.class)
 @SupportedAnnotationTypes("com.fast.cqrs.sql.annotation.SqlRepository")
-@SupportedSourceVersion(SourceVersion.RELEASE_21)
+@SupportedSourceVersion(SourceVersion.RELEASE_25)
 public class SqlRepositoryProcessor extends AbstractProcessor {
 
     private Elements elementUtils;
@@ -110,7 +110,7 @@ public class SqlRepositoryProcessor extends AbstractProcessor {
         TypeSpec.Builder classBuilder = TypeSpec.classBuilder(implClassName)
                 .addModifiers(Modifier.PUBLIC)
                 .addSuperinterface(TypeName.get(repositoryInterface.asType()))
-                .addAnnotation(AnnotationSpec.builder(ClassName.get("javax.annotation.processing", "Generated"))
+                .addAnnotation(AnnotationSpec.builder(ClassName.get("jakarta.annotation", "Generated"))
                         .addMember("value", "$S", SqlRepositoryProcessor.class.getCanonicalName())
                         .addMember("date", "$S", java.time.Instant.now().toString())
                         .build())

@@ -1,6 +1,7 @@
 package com.fast.cqrs.concurrent.stream;
 
 import com.fast.cqrs.concurrent.context.ContextSnapshot;
+import com.fast.cqrs.concurrent.executor.VirtualExecutorManager;
 
 import java.time.Duration;
 import java.util.*;
@@ -33,7 +34,9 @@ import java.util.function.*;
  */
 public class ParallelStream<T> {
 
-    private static final ExecutorService EXECUTOR = Executors.newVirtualThreadPerTaskExecutor();
+    private static ExecutorService getExecutor() {
+        return VirtualExecutorManager.getStaticExecutor();
+    }
 
     private final List<T> source;
     private int parallelism = Runtime.getRuntime().availableProcessors();
@@ -190,7 +193,7 @@ public class ParallelStream<T> {
             int index = i;
             T item = items.get(i);
 
-            Future<R> future = EXECUTOR.submit(() -> {
+            Future<R> future = getExecutor().submit(() -> {
                 try {
                     semaphore.acquire();
                     if (snapshot != null)

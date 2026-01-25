@@ -1,6 +1,7 @@
 package com.fast.cqrs.concurrent.scope;
 
 import com.fast.cqrs.concurrent.context.ContextSnapshot;
+import com.fast.cqrs.concurrent.executor.VirtualExecutorManager;
 
 import java.time.Duration;
 import java.util.*;
@@ -33,7 +34,9 @@ import java.util.function.Supplier;
  */
 public class TaskScope implements AutoCloseable {
 
-    private static final ExecutorService EXECUTOR = Executors.newVirtualThreadPerTaskExecutor();
+    private static ExecutorService getExecutor() {
+        return VirtualExecutorManager.getStaticExecutor();
+    }
 
     private final String name;
     private final List<Future<?>> children = new CopyOnWriteArrayList<>();
@@ -92,7 +95,7 @@ public class TaskScope implements AutoCloseable {
     public <T> Future<T> fork(Supplier<T> task) {
         ensureOpen();
 
-        Future<T> future = EXECUTOR.submit(() -> {
+        Future<T> future = getExecutor().submit(() -> {
             snapshot.restore();
             try {
                 return task.get();

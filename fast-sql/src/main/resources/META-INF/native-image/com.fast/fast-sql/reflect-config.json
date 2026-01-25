@@ -1,0 +1,24 @@
+[
+  {
+    "name": "com.fast.cqrs.sql.repository.EntityMetadata",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "com.fast.cqrs.sql.repository.EntityMetadata$ColumnInfo",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "com.fast.cqrs.sql.repository.CrudExecutor",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "com.fast.cqrs.sql.mapper.ResultMapper",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true
+  }
+]

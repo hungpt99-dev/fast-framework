@@ -2,6 +2,8 @@ package com.fast.cqrs.concurrent.flow;
 
 import com.fast.cqrs.concurrent.context.ContextSnapshot;
 
+import com.fast.cqrs.concurrent.executor.VirtualExecutorManager;
+
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.*;
@@ -28,7 +30,9 @@ import java.util.function.Supplier;
  */
 public class TaskGraph {
 
-    private static final ExecutorService EXECUTOR = Executors.newVirtualThreadPerTaskExecutor();
+    private static ExecutorService getExecutor() {
+        return VirtualExecutorManager.getStaticExecutor();
+    }
 
     private final Map<String, TaskNode> nodes = new LinkedHashMap<>();
     private Duration timeout;
@@ -108,7 +112,7 @@ public class TaskGraph {
                             if (snapshot != null)
                                 snapshot.clear();
                         }
-                    }, EXECUTOR);
+                    }, getExecutor());
 
             futures.put(node.name, future);
         }

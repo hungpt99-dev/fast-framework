@@ -4,6 +4,8 @@ import com.fast.cqrs.concurrent.context.ContextSnapshot;
 import com.fast.cqrs.concurrent.event.TaskEvent;
 import com.fast.cqrs.concurrent.event.TaskEventListener;
 
+import com.fast.cqrs.concurrent.executor.VirtualExecutorManager;
+
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.*;
@@ -38,7 +40,9 @@ import java.util.function.Supplier;
  */
 public class ParallelFlow {
 
-    private static final ExecutorService EXECUTOR = Executors.newVirtualThreadPerTaskExecutor();
+    private static ExecutorService getExecutor() {
+        return VirtualExecutorManager.getStaticExecutor();
+    }
 
     private final Map<String, Supplier<?>> tasks = new LinkedHashMap<>();
     private Duration timeout;
@@ -153,7 +157,7 @@ public class ParallelFlow {
             String name = entry.getKey();
             Supplier<?> supplier = entry.getValue();
 
-            Future<?> future = EXECUTOR.submit(() -> {
+            Future<?> future = getExecutor().submit(() -> {
                 try {
                     if (semaphore != null)
                         semaphore.acquire();
