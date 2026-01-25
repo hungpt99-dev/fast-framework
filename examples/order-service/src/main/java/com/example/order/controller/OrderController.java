@@ -16,21 +16,54 @@ import org.springframework.web.bind.annotation.*;
 /**
  * Order controller demonstrating GraalVM-compatible direct handler invocation.
  * <p>
- * Each method specifies an explicit handler for zero-reflection dispatch.
+ * Features demonstrated:
+ * <ul>
+ *   <li>Explicit handler binding (GraalVM compatible)</li>
+ *   <li>Command idempotency with TTL</li>
+ *   <li>Query result caching with TTL</li>
+ * </ul>
  */
 @HttpController
 @RequestMapping("/api/orders")
 public interface OrderController {
 
+    /**
+     * Create a new order.
+     * <p>
+     * Idempotent: Same requestId within 24h will return cached result.
+     */
     @PostMapping
-    @Command(handler = CreateOrderHandler.class)
-    void createOrder(@RequestBody CreateOrderCmd cmd);
+    @Command(
+        handler = CreateOrderHandler.class,
+        idempotencyKey = "#cmd.requestId",
+        idempotencyTtl = "24h"
+    )
+    void createOrder(@jakarta.validation.Valid @RequestBody CreateOrderCmd cmd);
 
+    /**
+     * Get order by ID.
+     * <p>
+     * Cached for 5 minutes to reduce database load.
+     */
     @GetMapping("/{id}")
-    @Query(handler = GetOrderHandler.class)
+    @Query(
+        handler = GetOrderHandler.class,
+        cache = "5m",
+        cacheKey = "#query.id"
+    )
     OrderDto getOrder(@ModelAttribute GetOrderQuery query);
 
+    /**
+     * List orders by customer.
+     * <p>
+     * Cached for 1 minute with customer-specific cache key.
+     */
     @GetMapping
-    @Query(handler = GetOrdersByCustomerHandler.class)
+    @Query(
+        handler = GetOrdersByCustomerHandler.class,
+        cache = "1m",
+        cacheKey = "#query.customerId"
+    )
     List<OrderDto> listOrders(@ModelAttribute GetOrdersByCustomerQuery query);
 }
+

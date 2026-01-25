@@ -482,10 +482,9 @@ public class HttpControllerProcessor extends AbstractProcessor {
     private boolean shouldCopyAnnotation(AnnotationMirror annotation) {
         String annotationType = annotation.getAnnotationType().toString();
         
-        // Exclude framework annotations
+        // Exclude framework annotations that shouldn't be copied
+        // NOTE: We MUST copy @Query and @Command for AOP aspects to work!
         if (annotationType.equals("com.fast.cqrs.cqrs.annotation.HttpController") ||
-            annotationType.equals("com.fast.cqrs.cqrs.annotation.Query") ||
-            annotationType.equals("com.fast.cqrs.cqrs.annotation.Command") ||
             annotationType.equals("java.lang.Override") ||
             annotationType.equals("jakarta.annotation.Generated") ||
             annotationType.equals("org.springframework.security.access.prepost.PreAuthorize")) {

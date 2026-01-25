@@ -55,7 +55,8 @@ public class BenchmarkHandler implements CommandHandler<StartBenchmarkCmd> {
 
     private void runGateway(int iterations) {
         for (int i = 0; i < iterations; i++) {
-            gateway.with(new CreateOrderCmd(null, "CUST-" + i, new BigDecimal("100")))
+            // requestId=null (not checking idempotency for benchmark), orderId=null (auto-gen), customerId, total
+            gateway.with(new CreateOrderCmd(null, null, "CUST-" + i, new BigDecimal("100")))
                    .send();
         }
     }
@@ -63,7 +64,7 @@ public class BenchmarkHandler implements CommandHandler<StartBenchmarkCmd> {
     private void runAsync(int iterations) throws InterruptedException {
         CountDownLatch latch = new CountDownLatch(iterations);
         for (int i = 0; i < iterations; i++) {
-            gateway.with(new CreateOrderCmd(null, "CUST-" + i, new BigDecimal("100")))
+            gateway.with(new CreateOrderCmd(null, null, "CUST-" + i, new BigDecimal("100")))
                    .onError(e -> latch.countDown())
                    .onSuccess(r -> latch.countDown())
                    .sendAsync();

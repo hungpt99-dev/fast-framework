@@ -32,7 +32,8 @@ class OrderControllerIntegrationTest {
     void shouldCreateAndGetOrder() throws Exception {
         String orderId = UUID.randomUUID().toString();
         String customerId = "cust-123";
-        CreateOrderCmd cmd = new CreateOrderCmd(orderId, customerId, new BigDecimal("99.99"));
+        String requestId = UUID.randomUUID().toString();
+        CreateOrderCmd cmd = new CreateOrderCmd(requestId, orderId, customerId, new BigDecimal("99.99"));
 
         // 1. Create Order (POST)
         // This exercises the CommandBus dispatch
