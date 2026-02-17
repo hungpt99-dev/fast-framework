@@ -63,7 +63,7 @@ subprojects {
                 pom {
                     name = project.name
                     description = 'CQRS Interface-Only Controller Framework'
-                    url = 'https://github.com/fast/fast-framework'
+                    url = 'https://github.com/hungpt99-dev/fast-framework'
                     
                     licenses {
                         license {
@@ -81,10 +81,21 @@ subprojects {
                     }
                     
                     scm {
-                        connection = 'scm:git:git://github.com/fast/fast-framework.git'
-                        developerConnection = 'scm:git:ssh://github.com:fast/fast-framework.git'
-                        url = 'https://github.com/fast/fast-framework'
+                        connection = 'scm:git:git://github.com/hungpt99-dev/fast-framework.git'
+                        developerConnection = 'scm:git:ssh://github.com:hungpt99-dev/fast-framework.git'
+                        url = 'https://github.com/hungpt99-dev/fast-framework'
                     }
+                }
+            }
+        }
+        
+        repositories {
+            maven {
+                name = "GitHubPackages"
+                url = uri("https://maven.pkg.github.com/hungpt99-dev/fast-framework")
+                credentials {
+                    username = System.getenv("GITHUB_ACTOR")
+                    password = System.getenv("GITHUB_TOKEN")
                 }
             }
         }
