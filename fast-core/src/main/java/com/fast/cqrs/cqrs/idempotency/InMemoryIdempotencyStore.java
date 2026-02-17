@@ -4,6 +4,8 @@ import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * In-memory implementation of {@link IdempotencyStore}.
@@ -24,7 +26,7 @@ public class InMemoryIdempotencyStore implements IdempotencyStore {
 
     // Cleanup runs every N operations
     private static final int CLEANUP_THRESHOLD = 1000;
-    private int operationCount = 0;
+    private final AtomicInteger operationCount = new AtomicInteger(0);
 
     @Override
     public Optional<IdempotencyRecord> get(String key) {
@@ -58,15 +60,19 @@ public class InMemoryIdempotencyStore implements IdempotencyStore {
     @Override
     public boolean tryLock(String key, Duration ttl) {
         long expiresAt = System.currentTimeMillis() + ttl.toMillis();
-        
-        return store.compute(key, (k, existing) -> {
+        AtomicBoolean acquired = new AtomicBoolean(false);
+
+        store.compute(key, (k, existing) -> {
             if (existing == null || existing.isExpired()) {
                 // No entry or expired - acquire lock
+                acquired.set(true);
                 return new Entry(null, System.currentTimeMillis(), expiresAt, false);
             }
             // Already exists (locked or completed)
             return existing;
-        }).result == null && !store.get(key).completed;
+        });
+
+        return acquired.get();
     }
 
     @Override
@@ -75,8 +81,8 @@ public class InMemoryIdempotencyStore implements IdempotencyStore {
     }
 
     private void maybeCleanup() {
-        if (++operationCount >= CLEANUP_THRESHOLD) {
-            operationCount = 0;
+        if (operationCount.incrementAndGet() >= CLEANUP_THRESHOLD) {
+            operationCount.set(0);
             long now = System.currentTimeMillis();
             store.entrySet().removeIf(e -> e.getValue().expiresAt < now);
         }

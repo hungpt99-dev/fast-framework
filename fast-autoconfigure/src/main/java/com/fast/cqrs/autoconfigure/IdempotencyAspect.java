@@ -40,6 +40,7 @@ public class IdempotencyAspect {
     private static final Logger log = LoggerFactory.getLogger(IdempotencyAspect.class);
     private static final SpelExpressionParser PARSER = new SpelExpressionParser();
     private static final Duration LOCK_TIMEOUT = Duration.ofMinutes(5);
+    private static final Duration MAX_WAIT_TIMEOUT = Duration.ofSeconds(30);
 
     private final IdempotencyStore idempotencyStore;
 
@@ -145,7 +146,8 @@ public class IdempotencyAspect {
     }
 
     private Object waitForResult(String key, Duration ttl) throws InterruptedException {
-        long deadline = System.currentTimeMillis() + ttl.toMillis();
+        long maxWaitMs = Math.min(ttl.toMillis(), MAX_WAIT_TIMEOUT.toMillis());
+        long deadline = System.currentTimeMillis() + maxWaitMs;
         
         while (System.currentTimeMillis() < deadline) {
             Thread.sleep(100);  // Poll every 100ms

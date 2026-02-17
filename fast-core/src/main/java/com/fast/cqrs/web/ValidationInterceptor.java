@@ -39,6 +39,7 @@ public class ValidationInterceptor {
             // Safe linkage check - triggers NoClassDefFoundError if missing
             ValidatorFactory factory = Validation.buildDefaultValidatorFactory();
             validator = factory.getValidator();
+            factory.close();
             available = true;
         } catch (Throwable e) {
             // Bean Validation not available

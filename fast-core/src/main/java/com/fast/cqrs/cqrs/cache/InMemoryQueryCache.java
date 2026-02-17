@@ -4,6 +4,7 @@ import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 
 /**
@@ -25,7 +26,7 @@ public class InMemoryQueryCache implements QueryCache {
 
     // Cleanup runs every N operations
     private static final int CLEANUP_THRESHOLD = 500;
-    private int operationCount = 0;
+    private final AtomicInteger operationCount = new AtomicInteger(0);
 
     @Override
     @SuppressWarnings("unchecked")
@@ -79,8 +80,8 @@ public class InMemoryQueryCache implements QueryCache {
     }
 
     private void maybeCleanup() {
-        if (++operationCount >= CLEANUP_THRESHOLD) {
-            operationCount = 0;
+        if (operationCount.incrementAndGet() >= CLEANUP_THRESHOLD) {
+            operationCount.set(0);
             long now = System.currentTimeMillis();
             cache.entrySet().removeIf(e -> e.getValue().expiresAt < now);
         }

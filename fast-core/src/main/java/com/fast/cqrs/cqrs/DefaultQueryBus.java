@@ -89,7 +89,7 @@ public class DefaultQueryBus implements QueryBus {
         while (current != null && current != Object.class) {
             try {
                 for (Method method : current.getDeclaredMethods()) {
-                    if (method.getName().equals(methodName)) {
+                    if (method.getName().equals(methodName) && !method.isSynthetic() && !method.isBridge()) {
                         return true;
                     }
                 }

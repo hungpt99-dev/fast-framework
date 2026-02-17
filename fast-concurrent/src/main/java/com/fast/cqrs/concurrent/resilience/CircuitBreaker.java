@@ -114,15 +114,14 @@ public class CircuitBreaker {
      * Records a successful execution.
      */
     public void recordSuccess() {
-        State currentState = state.get();
-
-        if (currentState == State.HALF_OPEN) {
+        if (state.get() == State.HALF_OPEN) {
             int successes = halfOpenSuccessCount.incrementAndGet();
             if (successes >= halfOpenSuccessThreshold) {
-                state.set(State.CLOSED);
-                failureCount.set(0);
+                if (state.compareAndSet(State.HALF_OPEN, State.CLOSED)) {
+                    failureCount.set(0);
+                }
             }
-        } else if (currentState == State.CLOSED) {
+        } else if (state.get() == State.CLOSED) {
             failureCount.set(0);
         }
     }
@@ -132,14 +131,13 @@ public class CircuitBreaker {
      */
     public void recordFailure() {
         lastFailureTime = System.currentTimeMillis();
-        State currentState = state.get();
 
-        if (currentState == State.HALF_OPEN) {
-            state.set(State.OPEN);
-        } else if (currentState == State.CLOSED) {
+        if (state.get() == State.HALF_OPEN) {
+            state.compareAndSet(State.HALF_OPEN, State.OPEN);
+        } else if (state.get() == State.CLOSED) {
             int failures = failureCount.incrementAndGet();
             if (failures >= failureThreshold) {
-                state.set(State.OPEN);
+                state.compareAndSet(State.CLOSED, State.OPEN);
             }
         }
     }

@@ -140,7 +140,14 @@ public class DefaultCommandGateway implements CommandGateway, DisposableBean {
         @SuppressWarnings("unchecked")
         public <R> R send() {
             try {
-                R result = executeWithRetry();
+                R result;
+                if (timeout != null) {
+                    result = (R) CompletableFuture.supplyAsync(
+                            this::executeWithRetry, executor
+                    ).orTimeout(timeout.toMillis(), TimeUnit.MILLISECONDS).join();
+                } else {
+                    result = executeWithRetry();
+                }
                 if (onSuccess != null) {
                     onSuccess.accept(result);
                 }

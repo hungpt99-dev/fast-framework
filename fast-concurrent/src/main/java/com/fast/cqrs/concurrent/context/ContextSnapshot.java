@@ -87,11 +87,16 @@ public class ContextSnapshot {
      */
     public Runnable wrap(Runnable runnable) {
         return () -> {
+            Map<String, String> originalMdc = MDC.getCopyOfContextMap();
             restore();
             try {
                 runnable.run();
             } finally {
-                clear();
+                if (originalMdc != null) {
+                    MDC.setContextMap(originalMdc);
+                } else {
+                    MDC.clear();
+                }
             }
         };
     }
@@ -101,11 +106,16 @@ public class ContextSnapshot {
      */
     public <T> java.util.function.Supplier<T> wrap(java.util.function.Supplier<T> supplier) {
         return () -> {
+            Map<String, String> originalMdc = MDC.getCopyOfContextMap();
             restore();
             try {
                 return supplier.get();
             } finally {
-                clear();
+                if (originalMdc != null) {
+                    MDC.setContextMap(originalMdc);
+                } else {
+                    MDC.clear();
+                }
             }
         };
     }
@@ -115,11 +125,16 @@ public class ContextSnapshot {
      */
     public <T> Callable<T> wrap(Callable<T> callable) {
         return () -> {
+            Map<String, String> originalMdc = MDC.getCopyOfContextMap();
             restore();
             try {
                 return callable.call();
             } finally {
-                clear();
+                if (originalMdc != null) {
+                    MDC.setContextMap(originalMdc);
+                } else {
+                    MDC.clear();
+                }
             }
         };
     }
@@ -129,11 +144,16 @@ public class ContextSnapshot {
      */
     public <T> java.util.function.Consumer<T> wrap(java.util.function.Consumer<T> consumer) {
         return (t) -> {
+            Map<String, String> originalMdc = MDC.getCopyOfContextMap();
             restore();
             try {
                 consumer.accept(t);
             } finally {
-                clear();
+                if (originalMdc != null) {
+                    MDC.setContextMap(originalMdc);
+                } else {
+                    MDC.clear();
+                }
             }
         };
     }
@@ -143,11 +163,16 @@ public class ContextSnapshot {
      */
     public <T, R> java.util.function.Function<T, R> wrap(java.util.function.Function<T, R> function) {
         return (t) -> {
+            Map<String, String> originalMdc = MDC.getCopyOfContextMap();
             restore();
             try {
                 return function.apply(t);
             } finally {
-                clear();
+                if (originalMdc != null) {
+                    MDC.setContextMap(originalMdc);
+                } else {
+                    MDC.clear();
+                }
             }
         };
     }

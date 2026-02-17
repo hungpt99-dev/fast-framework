@@ -186,88 +186,88 @@ public class SecurityInvocationInterceptor {
             }
 
             return parts;
-    }
+        }
 
-    private static int findMatchingParen(String expression, int startIdx) {
-        int depth = 0;
-        for (int i = startIdx; i < expression.length(); i++) {
-            char c = expression.charAt(i);
-            if (c == '(') depth++;
-            else if (c == ')') {
-                depth--;
-                if (depth == 0) return i;
+        private static int findMatchingParen(String expression, int startIdx) {
+            int depth = 0;
+            for (int i = startIdx; i < expression.length(); i++) {
+                char c = expression.charAt(i);
+                if (c == '(') depth++;
+                else if (c == ')') {
+                    depth--;
+                    if (depth == 0) return i;
+                }
             }
-        }
-        return -1;
-    }
-
-    private static boolean evaluateSingle(String expression) {
-        expression = expression.trim();
-
-        if (expression.startsWith("(") && expression.endsWith(")")) {
-            return evaluateCompound(expression.substring(1, expression.length() - 1));
+            return -1;
         }
 
-        if (expression.equals("permitAll()") || expression.equals("permitAll")) {
-            return true;
-        }
+        private static boolean evaluateSingle(String expression) {
+            expression = expression.trim();
 
-        if (expression.equals("denyAll()") || expression.equals("denyAll")) {
+            if (expression.startsWith("(") && expression.endsWith(")")) {
+                return evaluateCompound(expression.substring(1, expression.length() - 1));
+            }
+
+            if (expression.equals("permitAll()") || expression.equals("permitAll")) {
+                return true;
+            }
+
+            if (expression.equals("denyAll()") || expression.equals("denyAll")) {
+                return false;
+            }
+
+            if (expression.equals("isAuthenticated()") || expression.equals("isAuthenticated")) {
+                return FastSecurityContext.isAuthenticated();
+            }
+
+            if (expression.equals("isAnonymous()") || expression.equals("isAnonymous")) {
+                return !FastSecurityContext.isAuthenticated();
+            }
+
+            if (expression.equals("isFullyAuthenticated()") || expression.equals("isFullyAuthenticated")) {
+                return FastSecurityContext.isAuthenticated();
+            }
+
+            if (expression.equals("isRememberMe()") || expression.equals("isRememberMe")) {
+                log.warn("isRememberMe() is not supported, returning false");
+                return false;
+            }
+
+            if (!FastSecurityContext.isAuthenticated()) {
+                return false;
+            }
+
+            Matcher hasRoleMatcher = HAS_ROLE_PATTERN.matcher(expression);
+            if (hasRoleMatcher.matches()) {
+                String role = hasRoleMatcher.group(1);
+                return FastSecurityContext.hasRole(role);
+            }
+
+            Matcher hasAnyRoleMatcher = HAS_ANY_ROLE_PATTERN.matcher(expression);
+            if (hasAnyRoleMatcher.matches()) {
+                String[] roles = parseStringList(hasAnyRoleMatcher.group(1));
+                return FastSecurityContext.hasAnyRole(roles);
+            }
+
+            Matcher hasAuthorityMatcher = HAS_AUTHORITY_PATTERN.matcher(expression);
+            if (hasAuthorityMatcher.matches()) {
+                String authority = hasAuthorityMatcher.group(1);
+                return FastSecurityContext.hasAuthority(authority);
+            }
+
+            Matcher hasAnyAuthorityMatcher = HAS_ANY_AUTHORITY_PATTERN.matcher(expression);
+            if (hasAnyAuthorityMatcher.matches()) {
+                String[] authorities = parseStringList(hasAnyAuthorityMatcher.group(1));
+                return FastSecurityContext.hasAnyAuthority(authorities);
+            }
+
+            log.warn("Unknown @PreAuthorize expression: '{}'. Denying access.", expression);
             return false;
         }
 
-        if (expression.equals("isAuthenticated()") || expression.equals("isAuthenticated")) {
-            return FastSecurityContext.isAuthenticated();
+        private static String[] parseStringList(String listStr) {
+            return listStr.replaceAll("['\"]", "")
+                    .split("\\s*,\\s*");
         }
-
-        if (expression.equals("isAnonymous()") || expression.equals("isAnonymous")) {
-            return !FastSecurityContext.isAuthenticated();
-        }
-
-        if (expression.equals("isFullyAuthenticated()") || expression.equals("isFullyAuthenticated")) {
-            return FastSecurityContext.isAuthenticated();
-        }
-
-        if (expression.equals("isRememberMe()") || expression.equals("isRememberMe")) {
-            log.warn("isRememberMe() is not supported, returning false");
-            return false;
-        }
-
-        if (!FastSecurityContext.isAuthenticated()) {
-            return false;
-        }
-
-        Matcher hasRoleMatcher = HAS_ROLE_PATTERN.matcher(expression);
-        if (hasRoleMatcher.matches()) {
-            String role = hasRoleMatcher.group(1);
-            return FastSecurityContext.hasRole(role);
-        }
-
-        Matcher hasAnyRoleMatcher = HAS_ANY_ROLE_PATTERN.matcher(expression);
-        if (hasAnyRoleMatcher.matches()) {
-            String[] roles = parseStringList(hasAnyRoleMatcher.group(1));
-            return FastSecurityContext.hasAnyRole(roles);
-        }
-
-        Matcher hasAuthorityMatcher = HAS_AUTHORITY_PATTERN.matcher(expression);
-        if (hasAuthorityMatcher.matches()) {
-            String authority = hasAuthorityMatcher.group(1);
-            return FastSecurityContext.hasAuthority(authority);
-        }
-
-        Matcher hasAnyAuthorityMatcher = HAS_ANY_AUTHORITY_PATTERN.matcher(expression);
-        if (hasAnyAuthorityMatcher.matches()) {
-            String[] authorities = parseStringList(hasAnyAuthorityMatcher.group(1));
-            return FastSecurityContext.hasAnyAuthority(authorities);
-        }
-
-        log.warn("Unknown @PreAuthorize expression: '{}'. Denying access.", expression);
-        return false;
     }
-
-    private static String[] parseStringList(String listStr) {
-        return listStr.replaceAll("['\"]", "")
-                .split("\\s*,\\s*");
-    }
-}
 }

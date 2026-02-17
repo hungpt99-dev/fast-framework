@@ -15,14 +15,24 @@ allprojects {
 }
 
 subprojects {
+    // Core plugins needed for publishing
     apply plugin: 'java-library'
     apply plugin: 'maven-publish'
+    apply plugin: 'signing' // Added for GPG signing
     apply plugin: 'io.spring.dependency-management'
 
     java {
         toolchain {
             languageVersion = JavaLanguageVersion.of(25)
         }
+        withJavadocJar()
+        withSourcesJar()
+    }
+    
+    // Make Javadoc lenient
+    tasks.withType(Javadoc) {
+        options.addStringOption('Xdoclint:none', '-quiet')
+        failOnError = false
     }
 
     dependencyManagement {
@@ -61,8 +71,34 @@ subprojects {
                             url = 'http://www.apache.org/licenses/LICENSE-2.0.txt'
                         }
                     }
+                    
+                    developers {
+                        developer {
+                            id = 'fast-team'
+                            name = 'Fast Framework Team'
+                            email = 'team@fast.com'
+                        }
+                    }
+                    
+                    scm {
+                        connection = 'scm:git:git://github.com/fast/fast-framework.git'
+                        developerConnection = 'scm:git:ssh://github.com:fast/fast-framework.git'
+                        url = 'https://github.com/fast/fast-framework'
+                    }
                 }
             }
+        }
+    }
+
+    // Signing configuration
+    signing {
+        def signingKey = findProperty("signingKey")
+        def signingPassword = findProperty("signingPassword")
+        
+        // Only sign if keys are present (avoids failure in CI/local without keys)
+        if (signingKey && signingPassword) {
+            useInMemoryPgpKeys(signingKey, signingPassword)
+            sign publishing.publications.mavenJava
         }
     }
 

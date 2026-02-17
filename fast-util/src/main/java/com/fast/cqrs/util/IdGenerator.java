@@ -82,6 +82,6 @@ public final class IdGenerator {
      * Generates a numeric ID.
      */
     public static long numericId() {
-        return Math.abs(RANDOM.nextLong());
+        return RANDOM.nextLong() & Long.MAX_VALUE;
     }
 }

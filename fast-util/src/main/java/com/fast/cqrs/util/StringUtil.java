@@ -42,6 +42,9 @@ public final class StringUtil {
         if (str == null || str.length() <= maxLength) {
             return str;
         }
+        if (maxLength <= 3) {
+            return str.substring(0, maxLength);
+        }
         return str.substring(0, maxLength - 3) + "...";
     }
 
