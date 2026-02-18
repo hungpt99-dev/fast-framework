@@ -527,7 +527,7 @@ public class SqlRepositoryProcessor extends AbstractProcessor {
             builder.addStatement("$T<?> results = jdbcTemplate.query($S, params, rowMapper)",
                     List.class, sql);
             builder.addStatement("$T $N = results.isEmpty() ? $T.empty() : $T.of(results.get(0))",
-                    TypeName.get(returnType), resultVar, Optional.class, Optional.class);
+                    TypeName.get(returnType).box(), resultVar, Optional.class, Optional.class);
         } else if (isCollectionType(returnType)) {
             builder.addCode("\n// Compile-time generated RowMapper (zero reflection)\n");
             builder.addStatement("$T<$T> rowMapper = $L",
@@ -535,13 +535,13 @@ public class SqlRepositoryProcessor extends AbstractProcessor {
                     TypeName.get(elementType),
                     generateRowMapperLambda(elementType));
             builder.addStatement("$T $N = jdbcTemplate.query($S, params, rowMapper)",
-                    TypeName.get(returnType), resultVar, sql);
+                    TypeName.get(returnType).box(), resultVar, sql);
         } else {
             // Single result
             builder.addCode("\n// Compile-time generated RowMapper (zero reflection)\n");
             builder.addStatement("$T<$T> rowMapper = $L",
                     ClassName.get("org.springframework.jdbc.core", "RowMapper"),
-                    TypeName.get(returnType),
+                    TypeName.get(returnType).box(),
                     generateRowMapperLambda(returnType));
             builder.addStatement("$T<?> results = jdbcTemplate.query($S, params, rowMapper)",
                     List.class, sql);
@@ -560,7 +560,7 @@ public class SqlRepositoryProcessor extends AbstractProcessor {
                     ClassName.get("com.fast.cqrs.sql.executor", "SqlExecutionException"),
                     "Expected single result but got ");
             builder.endControlFlow();
-            builder.addStatement("$T $N = ($T) results.get(0)", TypeName.get(returnType), resultVar, TypeName.get(returnType));
+            builder.addStatement("$T $N = ($T) results.get(0)", TypeName.get(returnType).box(), resultVar, TypeName.get(returnType));
         }
 
         // Store in cache if enabled
