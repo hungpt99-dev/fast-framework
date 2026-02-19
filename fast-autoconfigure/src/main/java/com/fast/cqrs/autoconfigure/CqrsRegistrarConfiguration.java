@@ -72,4 +72,13 @@ public class CqrsRegistrarConfiguration {
     public com.fast.cqrs.cqrs.gateway.QueryGateway queryGateway(QueryBus queryBus) {
         return new com.fast.cqrs.cqrs.gateway.DefaultQueryGateway(queryBus);
     }
+
+    /**
+     * Creates the EventBus bean.
+     */
+    @Bean
+    @ConditionalOnMissingBean(com.fast.cqrs.cqrs.EventBus.class)
+    public com.fast.cqrs.cqrs.EventBus eventBus(List<com.fast.cqrs.cqrs.EventHandler<?>> handlers) {
+        return new com.fast.cqrs.cqrs.DefaultEventBus(handlers);
+    }
 }
