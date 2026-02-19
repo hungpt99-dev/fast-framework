@@ -81,21 +81,49 @@ public class CrudExecutor<T, ID> {
             // Insert
             String sql = CrudSqlGenerator.insert(metadata);
             log.trace("Executing insert: {}", sql);
-            jdbcTemplate.update(sql, new BeanPropertySqlParameterSource(entity));
+            jdbcTemplate.update(sql, createParameters(entity));
         } else {
             // Update
             String sql = CrudSqlGenerator.update(metadata);
             log.trace("Executing update: {}", sql);
             
-            Map<String, Object> params = new HashMap<>();
-            params.put("id", id);
-            for (EntityMetadata.ColumnInfo col : metadata.getColumns()) {
-                params.put(col.field().getName(), col.getValue(entity));
-            }
+            MapSqlParameterSource params = createParameters(entity);
+            params.addValue("id", id);
             jdbcTemplate.update(sql, params);
         }
         
         return entity;
+    }
+
+    private MapSqlParameterSource createParameters(T entity) {
+        MapSqlParameterSource params = new MapSqlParameterSource();
+        // Add ID if it's part of the parameters (usually handled separately for updates, but good for insert)
+        Object idValue = metadata.getIdValue(entity);
+        if (idValue != null) {
+            params.addValue("id", idValue);
+        }
+
+        for (EntityMetadata.ColumnInfo col : metadata.getColumns()) {
+            Object value = col.getValue(entity);
+            if (value != null && value.getClass().isArray()) {
+                 // Handle Arrays (String[])
+                 if (value instanceof String[]) {
+                     final String[] arrayValue = (String[]) value;
+                     params.addValue(col.field().getName(), new org.springframework.jdbc.core.support.AbstractSqlTypeValue() {
+                         @Override
+                         protected java.lang.Object createTypeValue(java.sql.Connection conn, int sqlType, String typeName) throws java.sql.SQLException {
+                             return conn.createArrayOf("varchar", arrayValue);
+                         }
+                     });
+                 } else {
+                     // Default fallback for other arrays or let Spring handle it
+                     params.addValue(col.field().getName(), value);
+                 }
+            } else {
+                params.addValue(col.field().getName(), value);
+            }
+        }
+        return params;
     }
 
     public void saveAll(List<T> entities) {
@@ -106,9 +134,9 @@ public class CrudExecutor<T, ID> {
         String sql = CrudSqlGenerator.insert(metadata);
         log.trace("Executing batch insert: {} ({} entities)", sql, entities.size());
 
-        BeanPropertySqlParameterSource[] batchParams = entities.stream()
-            .map(BeanPropertySqlParameterSource::new)
-            .toArray(BeanPropertySqlParameterSource[]::new);
+        MapSqlParameterSource[] batchParams = entities.stream()
+            .map(this::createParameters)
+            .toArray(MapSqlParameterSource[]::new);
 
         jdbcTemplate.batchUpdate(sql, batchParams);
     }
@@ -127,11 +155,9 @@ public class CrudExecutor<T, ID> {
 
         MapSqlParameterSource[] batchParams = entities.stream()
             .map(entity -> {
-                MapSqlParameterSource params = new MapSqlParameterSource();
+                MapSqlParameterSource params = createParameters(entity);
+                // Ensure ID is present (createParameters adds it, but let's be safe)
                 params.addValue("id", metadata.getIdValue(entity));
-                for (EntityMetadata.ColumnInfo col : metadata.getColumns()) {
-                    params.addValue(col.field().getName(), col.getValue(entity));
-                }
                 return params;
             })
             .toArray(MapSqlParameterSource[]::new);
